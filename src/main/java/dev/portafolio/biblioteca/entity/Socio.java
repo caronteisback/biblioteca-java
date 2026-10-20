@@ -1,16 +1,12 @@
-package dev.portafolio.biblioteca.ejemplar;
+package dev.portafolio.biblioteca.entity;
 
-import dev.portafolio.biblioteca.comun.EntidadBase;
-import dev.portafolio.biblioteca.libro.Libro;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.LocalDate;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,12 +15,12 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "ejemplar")
+@Table(name = "socio")
 @Getter
 @Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @ToString(onlyExplicitlyIncluded = true)
-public class Ejemplar extends EntidadBase {
+public class Socio extends EntidadBase {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -32,25 +28,28 @@ public class Ejemplar extends EntidadBase {
 	@ToString.Include
 	private Long id;
 
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "libro_id", nullable = false)
-	private Libro libro;
+	@Column(nullable = false, length = 120)
+	private String nombre;
 
-	@Column(nullable = false, length = 30)
-	@ToString.Include
-	private String codigo;
+	@Column(nullable = false, length = 150)
+	private String email;
 
 	@Column(nullable = false)
 	@Setter(AccessLevel.NONE)
 	private boolean activo = true;
 
+	@Column(name = "fecha_registro", nullable = false)
+	@Setter(AccessLevel.NONE)
+	private LocalDate fechaRegistro;
+
 	@Builder
-	public Ejemplar(Libro libro, String codigo) {
-		this.libro = libro;
-		this.codigo = codigo;
+	public Socio(String nombre, String email, LocalDate fechaRegistro) {
+		this.nombre = nombre;
+		this.email = email;
+		this.fechaRegistro = fechaRegistro;
 	}
 
-	public void darDeBaja() {
+	public void desactivar() {
 		this.activo = false;
 	}
 

@@ -1,15 +1,10 @@
-package dev.portafolio.biblioteca.persistencia;
+package dev.portafolio.biblioteca.repository;
 
 import dev.portafolio.biblioteca.TestcontainersConfiguration;
-import dev.portafolio.biblioteca.ejemplar.Ejemplar;
-import dev.portafolio.biblioteca.ejemplar.EjemplarRepository;
-import dev.portafolio.biblioteca.libro.Libro;
-import dev.portafolio.biblioteca.libro.LibroRepository;
-import dev.portafolio.biblioteca.multa.MultaRepository;
-import dev.portafolio.biblioteca.prestamo.Prestamo;
-import dev.portafolio.biblioteca.prestamo.PrestamoRepository;
-import dev.portafolio.biblioteca.socio.Socio;
-import dev.portafolio.biblioteca.socio.SocioRepository;
+import dev.portafolio.biblioteca.entity.Ejemplar;
+import dev.portafolio.biblioteca.entity.Libro;
+import dev.portafolio.biblioteca.entity.Prestamo;
+import dev.portafolio.biblioteca.entity.Socio;
 import java.time.LocalDate;
 import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.beans.factory.annotation.Autowired;

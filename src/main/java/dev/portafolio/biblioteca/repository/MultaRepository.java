@@ -1,5 +1,7 @@
-package dev.portafolio.biblioteca.multa;
+package dev.portafolio.biblioteca.repository;
 
+import dev.portafolio.biblioteca.entity.EstadoMulta;
+import dev.portafolio.biblioteca.entity.Multa;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 

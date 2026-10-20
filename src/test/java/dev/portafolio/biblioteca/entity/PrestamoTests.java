@@ -1,4 +1,4 @@
-package dev.portafolio.biblioteca.prestamo;
+package dev.portafolio.biblioteca.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

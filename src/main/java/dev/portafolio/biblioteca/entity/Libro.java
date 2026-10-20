@@ -1,6 +1,5 @@
-package dev.portafolio.biblioteca.libro;
+package dev.portafolio.biblioteca.entity;
 
-import dev.portafolio.biblioteca.comun.EntidadBase;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

@@ -1,5 +1,6 @@
-package dev.portafolio.biblioteca.socio;
+package dev.portafolio.biblioteca.repository;
 
+import dev.portafolio.biblioteca.entity.Socio;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 import java.util.Optional;

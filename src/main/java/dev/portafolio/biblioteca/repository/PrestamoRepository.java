@@ -1,5 +1,6 @@
-package dev.portafolio.biblioteca.prestamo;
+package dev.portafolio.biblioteca.repository;
 
+import dev.portafolio.biblioteca.entity.Prestamo;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 import java.time.LocalDate;

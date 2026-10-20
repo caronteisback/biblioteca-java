@@ -1,4 +1,4 @@
-package dev.portafolio.biblioteca.comun;
+package dev.portafolio.biblioteca.entity;
 
 import org.hibernate.Hibernate;
 

@@ -1,5 +1,6 @@
-package dev.portafolio.biblioteca.libro;
+package dev.portafolio.biblioteca.repository;
 
+import dev.portafolio.biblioteca.entity.Libro;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 

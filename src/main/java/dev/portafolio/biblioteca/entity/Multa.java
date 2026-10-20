@@ -1,7 +1,5 @@
-package dev.portafolio.biblioteca.multa;
+package dev.portafolio.biblioteca.entity;
 
-import dev.portafolio.biblioteca.comun.EntidadBase;
-import dev.portafolio.biblioteca.prestamo.Prestamo;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

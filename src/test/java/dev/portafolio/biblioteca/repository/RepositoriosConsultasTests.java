@@ -1,13 +1,13 @@
-package dev.portafolio.biblioteca.persistencia;
+package dev.portafolio.biblioteca.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.portafolio.biblioteca.ejemplar.Ejemplar;
-import dev.portafolio.biblioteca.libro.Libro;
-import dev.portafolio.biblioteca.multa.EstadoMulta;
-import dev.portafolio.biblioteca.multa.Multa;
-import dev.portafolio.biblioteca.prestamo.Prestamo;
-import dev.portafolio.biblioteca.socio.Socio;
+import dev.portafolio.biblioteca.entity.Ejemplar;
+import dev.portafolio.biblioteca.entity.Libro;
+import dev.portafolio.biblioteca.entity.EstadoMulta;
+import dev.portafolio.biblioteca.entity.Multa;
+import dev.portafolio.biblioteca.entity.Prestamo;
+import dev.portafolio.biblioteca.entity.Socio;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 

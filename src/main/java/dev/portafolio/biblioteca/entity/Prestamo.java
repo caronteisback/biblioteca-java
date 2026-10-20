@@ -1,8 +1,5 @@
-package dev.portafolio.biblioteca.prestamo;
+package dev.portafolio.biblioteca.entity;
 
-import dev.portafolio.biblioteca.comun.EntidadBase;
-import dev.portafolio.biblioteca.ejemplar.Ejemplar;
-import dev.portafolio.biblioteca.socio.Socio;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
