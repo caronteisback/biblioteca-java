@@ -9,8 +9,17 @@ REST API for a library system (books, copies, members and loans), built with **J
 | Part | Scope | State |
 |------|-------|-------|
 | A | Project skeleton, Oracle XE in Docker, Flyway, health endpoint, Testcontainers | Done |
-| B | Domain model, CRUD for books and members, loan/return rules, error model | Planned |
+| B | Domain model, CRUD for books and members, loan/return rules, error model | Designed (rules and diagrams in `docs/`), code next |
 | C | OpenAPI documentation, integration tests for the loan flow, final README | Planned |
+
+## Documentation
+
+The design comes first and lives in [`docs/`](docs/README.md):
+
+- [Business rules](docs/business-rules.md) and the error catalog
+- [Process flows](docs/diagrams/process-flows.md) and [sequence diagrams](docs/diagrams/sequence-diagrams.md)
+- [Class diagram](docs/diagrams/class-diagram.md) (JPA entities) and [ER diagram](docs/diagrams/er-diagram.md) (Oracle)
+- [Architecture decisions](docs/adr/)
 
 ## Architecture
 
