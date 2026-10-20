@@ -34,6 +34,9 @@ All numbers below live in `application.yml` and can change without touching code
 | `biblioteca.score.penalizacion-base` | 10 | Points lost per late loan |
 | `biblioteca.score.penalizacion-por-dia` | 1 | Extra points lost per day of delay |
 | `biblioteca.score.umbral-bloqueo` | 50 | Members below this score cannot start new loans |
+| `biblioteca.zona-horaria` | `America/Lima` | Time zone that defines "today" |
+
+An invalid value (for example a term of 0 days, a free fine, or more than 3 renewals) stops the application at startup instead of failing in the middle of a loan.
 
 ## 4. Catalog rules
 
@@ -134,8 +137,10 @@ Every error body has the same shape and never exposes internals (no stack traces
 | HTTP | Meaning |
 |------|---------|
 | 400 | The request is malformed or invalid |
-| 404 | The resource does not exist |
+| 404 | The resource or the endpoint does not exist |
+| 405 | The HTTP method is not allowed on that endpoint |
 | 409 | The request conflicts with the current state |
+| 415 | The content type is not supported |
 | 422 | The request is valid but breaks a business rule |
 | 500 | Unexpected failure; the body is always generic |
 
@@ -143,12 +148,15 @@ Every error body has the same shape and never exposes internals (no stack traces
 
 | HTTP | Code | When |
 |------|------|------|
-| 400 | `VALIDATION_ERROR` | Missing or malformed field (blank title, bad ISBN format, invalid email) |
+| 400 | `VALIDATION_ERROR` | Missing or malformed field or body (blank title, bad ISBN format, invalid email, broken JSON, wrong parameter type). The message names each field |
 | 404 | `BOOK_NOT_FOUND` | Unknown book |
 | 404 | `COPY_NOT_FOUND` | Unknown copy |
 | 404 | `MEMBER_NOT_FOUND` | Unknown member |
 | 404 | `LOAN_NOT_FOUND` | Unknown loan |
 | 404 | `FINE_NOT_FOUND` | Unknown fine |
+| 404 | `ENDPOINT_NOT_FOUND` | The route does not exist |
+| 405 | `METHOD_NOT_ALLOWED` | Right route, wrong HTTP method |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | Request body is not `application/json` |
 | 409 | `COPY_ALREADY_ON_LOAN` | The copy has an active loan |
 | 409 | `LOAN_ALREADY_RETURNED` | Returning or renewing a loan that was already returned |
 | 409 | `FINE_ALREADY_PAID` | Paying a fine that is already paid |
@@ -160,6 +168,7 @@ Every error body has the same shape and never exposes internals (no stack traces
 | 409 | `COPY_HAS_ACTIVE_LOAN` | Retiring a copy that is on loan |
 | 409 | `MEMBER_HAS_HISTORY` | Deleting a member that appears in a loan |
 | 409 | `MEMBER_HAS_ACTIVE_LOANS` | Deactivating a member with active loans |
+| 409 | `CONCURRENT_UPDATE` | The lock on the member or the loan was not obtained within 5 seconds. The client may retry |
 | 422 | `MEMBER_INACTIVE` | Loan or renewal for an inactive member |
 | 422 | `COPY_INACTIVE` | Loan of a retired copy |
 | 422 | `MEMBER_HAS_OVERDUE_LOAN` | New loan while another one is overdue |

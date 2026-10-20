@@ -10,7 +10,9 @@ REST API for a library system (books, copies, members and loans), built with **J
 |------|-------|-------|
 | A | Project skeleton, Oracle XE in Docker, Flyway, health endpoint, Testcontainers | Done |
 | B1 | Schema (`V1`), JPA entities and repositories, constraint and query tests | Done |
-| B2 | Services with the loan/renew/return rules, REST controllers, error model | Next (rules and diagrams are in `docs/`) |
+| B2a | Business parameters, clock, error model (`{code, message}`), score, fine and alert calculation | Done |
+| B2b | Catalog and members: services and REST controllers | Next |
+| B2c | Loans, renewals, returns and fines, with concurrency tests | Planned |
 | C | OpenAPI documentation, integration tests for the loan flow, final README | Planned |
 
 ## Documentation
@@ -88,6 +90,9 @@ Tests start a throwaway Oracle XE 21c container with Testcontainers (Docker must
 - `PrestamoTests`: the date rules of a loan, without a database.
 - `EsquemaRestriccionesTests`: the rules the schema enforces on its own (one active loan per copy, renewals 0 to 3, unique email ignoring case, fine consistency). Each rejection is checked by the constraint name Oracle reports.
 - `RepositoriosConsultasTests`: the locking and counting queries the services will use.
+- `ScoreCalculatorTests`, `AlertaCalculatorTests`: the score formula and the alerts, including the worked example of the business rules.
+- `GlobalExceptionHandlerTests`: every failure comes out as `{code, message}` with the right status and without internals (SQL, constraint names, stack traces).
+- `ConstraintErrorsTests`, `BibliotecaPropertiesTests`: constraint-to-error translation and the validation of the business parameters at startup.
 
 ## Key decisions
 

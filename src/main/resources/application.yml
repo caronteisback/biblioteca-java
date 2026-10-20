@@ -14,6 +14,27 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+  web:
+    # Fixed locale so validation messages are always English, whatever the machine or the client sends.
+    locale: en
+    locale-resolver: fixed
+
+# Business parameters (see docs/business-rules.md, section 3). Change them here, not in code.
+# max-renovaciones cannot exceed 3: the schema has a CHECK constraint with that bound.
+biblioteca:
+  zona-horaria: America/Lima
+  prestamo:
+    dias-plazo: 14
+    max-activos: 5
+    max-renovaciones: 3
+    alerta-dias-previos: 2
+  multa:
+    por-dia: 1.00
+  score:
+    inicial: 100
+    penalizacion-base: 10
+    penalizacion-por-dia: 1
+    umbral-bloqueo: 50
 
 management:
   endpoints:
