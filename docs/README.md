@@ -9,6 +9,7 @@ Everything here describes the system before it is built, so code and tests can b
 | [Sequence diagrams](diagrams/sequence-diagrams.md) | How a request travels from the librarian to Oracle, with locks and error paths |
 | [Class diagram](diagrams/class-diagram.md) | The JPA entities and how they relate in Java |
 | [ER diagram](diagrams/er-diagram.md) | The Oracle tables, keys and cardinalities, plus the constraints and indexes |
+| [Query plans](query-plans.md) | How to check a plan with `DBMS_XPLAN` and which indexes the hot queries use |
 | [Architecture decisions](adr/) | Why Spring Boot 4, JPA, Oracle XE and Flyway |
 
 ## Reading order

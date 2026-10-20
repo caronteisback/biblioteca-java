@@ -9,7 +9,8 @@ REST API for a library system (books, copies, members and loans), built with **J
 | Part | Scope | State |
 |------|-------|-------|
 | A | Project skeleton, Oracle XE in Docker, Flyway, health endpoint, Testcontainers | Done |
-| B | Domain model, CRUD for books and members, loan/return rules, error model | Designed (rules and diagrams in `docs/`), code next |
+| B1 | Schema (`V1`), JPA entities and repositories, constraint and query tests | Done |
+| B2 | Services with the loan/renew/return rules, REST controllers, error model | Next (rules and diagrams are in `docs/`) |
 | C | OpenAPI documentation, integration tests for the loan flow, final README | Planned |
 
 ## Documentation
@@ -38,6 +39,7 @@ controller  ->  service  ->  repository  ->  Oracle XE
 - JDK 17 or newer (the code is compiled with `release 17`)
 - Docker Desktop (Compose v2)
 - No Maven installation needed: use the included wrapper (`mvnw` / `mvnw.cmd`)
+- IntelliJ IDEA: the project uses Lombok. Reload the Maven project and enable *Settings > Build, Execution, Deployment > Compiler > Annotation Processors > Enable annotation processing*. Maven builds need nothing extra
 
 ## Run
 
@@ -80,7 +82,11 @@ Stop the database with `docker compose down`. To wipe all data and re-run initia
 ./mvnw test
 ```
 
-Tests start a throwaway Oracle XE 21c container with Testcontainers (Docker must be running; the first run downloads the image). They do not touch the compose database.
+Tests start a throwaway Oracle XE 21c container with Testcontainers (Docker must be running; the first run downloads the image). One container is shared by the whole run, and the tests do not touch the compose database.
+
+- `PrestamoTests`: the date rules of a loan, without a database.
+- `EsquemaRestriccionesTests`: the rules the schema enforces on its own (one active loan per copy, renewals 0 to 3, unique email ignoring case, fine consistency). Each rejection is checked by the constraint name Oracle reports.
+- `RepositoriosConsultasTests`: the locking and counting queries the services will use.
 
 ## Key decisions
 
@@ -88,6 +94,7 @@ Tests start a throwaway Oracle XE 21c container with Testcontainers (Docker must
 |----------|--------|-------------------------|
 | Framework | Spring Boot 4.1 (Java 17 baseline) | Spring Boot 3.5: open-source support ended on 2026-06-30 |
 | Persistence | Spring Data JPA | JdbcTemplate: more control, much more boilerplate |
+| Boilerplate | Lombok on entities (no `@Data`) | Hand-written getters and builders: more explicit, more code |
 | Database | Oracle XE 21c | PostgreSQL: lighter, but not the target engine; H2: hides Oracle-specific behavior |
 | Schema management | Flyway (plain SQL) | Hibernate `ddl-auto`: unsafe and unversioned |
 | Test database | Testcontainers with the same Oracle image | H2 in Oracle mode: not the real engine |

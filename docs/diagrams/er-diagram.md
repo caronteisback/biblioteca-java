@@ -57,7 +57,9 @@ erDiagram
 | `CHECK (renovaciones BETWEEN 0 AND 3)` | Renewal counter stays in range |
 | `CHECK (fecha_vencimiento >= fecha_prestamo)` and `CHECK (fecha_devolucion >= fecha_prestamo)` | Coherent dates |
 | `CHECK (estado IN ('PENDING','PAID'))` on `multa` | Valid fine status |
-| Index on `ejemplar(libro_id)` and on `prestamo(socio_id)` | Oracle does not index foreign keys by itself; these serve joins and the active-loans lookup |
+| Index on `ejemplar(libro_id)`, on `prestamo(socio_id, fecha_devolucion)` and on `prestamo(ejemplar_id)` | Oracle does not index foreign keys by itself. The composite also answers "active loans of a member" from the index alone; the others serve joins and parent-row locking |
+
+The upper bound of the renewals `CHECK` is written into the schema as 3. If the configured maximum (`biblioteca.prestamo.max-renovaciones`) ever changes, a new migration must change the constraint too. See [query plans](../query-plans.md) for how the indexes are used.
 
 ## What is deliberately not stored
 

@@ -115,7 +115,7 @@ Alerts are calculated on every query and never stored. Member and loan responses
 | One active loan per copy | Unique function-based index on `prestamo` over `CASE WHEN fecha_devolucion IS NULL THEN ejemplar_id END`. A violation is translated to `409 COPY_ALREADY_ON_LOAN` |
 | At most 5 active loans per member | The member row is locked (`PESSIMISTIC_WRITE`) while a loan is created, so a member's loans are processed one at a time |
 | Double return or double renewal | The loan row is locked while it is returned or renewed; the second request sees the new state |
-| Renewal counter in range | `CHECK` constraint between 0 and the maximum on `prestamo.renovaciones` |
+| Renewal counter in range | `CHECK` constraint between 0 and 3 on `prestamo.renovaciones`. The bound is written into the schema; if `max-renovaciones` changes, a migration must change the constraint |
 
 ## 12. Time
 
