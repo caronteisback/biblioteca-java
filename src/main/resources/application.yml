@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: biblioteca-java
+  profiles:
+    # Used only when no profile is set explicitly. Tests activate "test".
+    default: dev
+  config:
+    # Lets the same .env file feed docker compose and Spring (KEY=VALUE, no quotes).
+    import: optional:file:.env[.properties]
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Flyway is the only owner of the schema; Hibernate just verifies it.
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      # Never leak internal details (driver, URL, validation query) to clients.
+      show-details: never
+
+server:
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never

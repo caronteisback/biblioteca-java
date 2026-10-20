@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    # XEPDB1 is the pluggable database; connecting to "XE" (the CDB root) fails with ORA-12514/ORA-65096.
+    url: jdbc:oracle:thin:@//localhost:${ORACLE_PORT:1521}/XEPDB1
+    username: ${APP_USER}
+    password: ${APP_USER_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 10000

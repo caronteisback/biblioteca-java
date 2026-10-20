@@ -1,0 +1,25 @@
+services:
+  oracle:
+    image: gvenzl/oracle-xe:21-slim-faststart
+    container_name: biblioteca-oracle
+    environment:
+      # SYS/SYSTEM password. Used only for administration, never by the application.
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD:?Set ORACLE_PASSWORD in .env (copy .env.example)}
+      # Application schema created in XEPDB1 on first start. Flyway runs as this user.
+      APP_USER: ${APP_USER:?Set APP_USER in .env}
+      APP_USER_PASSWORD: ${APP_USER_PASSWORD:?Set APP_USER_PASSWORD in .env}
+    ports:
+      # Bound to loopback only: the database is not reachable from the network.
+      - "127.0.0.1:${ORACLE_PORT:-1521}:1521"
+    volumes:
+      # Named volume (bind mounts on Windows hit permission issues with the oracle user).
+      - oracle-data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+volumes:
+  oracle-data:
