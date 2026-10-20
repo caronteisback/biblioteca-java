@@ -5,6 +5,7 @@ Everything here describes the system before it is built, so code and tests can b
 | Document | What it answers |
 |----------|-----------------|
 | [Business rules](business-rules.md) | What the system must do: loan, renewal, return, fines, score, error catalog |
+| [API conventions](api-conventions.md) | Endpoints, status codes, pagination and filters shared by every resource |
 | [Process flows](diagrams/process-flows.md) | In which order the checks run and which error each failure returns |
 | [Sequence diagrams](diagrams/sequence-diagrams.md) | How a request travels from the librarian to Oracle, with locks and error paths |
 | [Class diagram](diagrams/class-diagram.md) | The JPA entities and how they relate in Java |

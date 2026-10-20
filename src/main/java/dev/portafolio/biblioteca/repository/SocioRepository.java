@@ -4,6 +4,8 @@ import dev.portafolio.biblioteca.entity.Socio;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -15,6 +17,11 @@ public interface SocioRepository extends JpaRepository<Socio, Long> {
 	Optional<Socio> findByEmailIgnoreCase(String email);
 
 	boolean existsByEmailIgnoreCase(String email);
+
+	boolean existsByEmailIgnoreCaseAndIdNot(String email, Long id);
+
+	/** Name or email contains the text, ignoring case. Wildcard characters in the text are escaped. */
+	Page<Socio> findByNombreContainingIgnoreCaseOrEmailContainingIgnoreCase(String nombre, String email, Pageable pageable);
 
 	/**
 	 * Reads the member with {@code SELECT ... FOR UPDATE}. Creating a loan calls this first, so a

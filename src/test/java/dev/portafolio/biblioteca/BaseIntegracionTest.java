@@ -1,12 +1,23 @@
-package dev.portafolio.biblioteca.repository;
+package dev.portafolio.biblioteca;
 
-import dev.portafolio.biblioteca.TestcontainersConfiguration;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import dev.portafolio.biblioteca.entity.Ejemplar;
 import dev.portafolio.biblioteca.entity.Libro;
 import dev.portafolio.biblioteca.entity.Prestamo;
 import dev.portafolio.biblioteca.entity.Socio;
+import dev.portafolio.biblioteca.exception.BusinessException;
+import dev.portafolio.biblioteca.exception.ErrorCode;
+import dev.portafolio.biblioteca.repository.EjemplarRepository;
+import dev.portafolio.biblioteca.repository.LibroRepository;
+import dev.portafolio.biblioteca.repository.MultaRepository;
+import dev.portafolio.biblioteca.repository.PrestamoRepository;
+import dev.portafolio.biblioteca.repository.SocioRepository;
+
 import java.time.LocalDate;
 import java.util.concurrent.atomic.AtomicLong;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -15,16 +26,23 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Real Oracle XE (Testcontainers) with the Flyway schema. Every test runs in a transaction that is
- * rolled back, so tests do not see each other's rows. All data is fictional.
+ * Real Oracle XE (Testcontainers) with the Flyway schema and a frozen clock ({@link #HOY}). Every
+ * test runs in a transaction that is rolled back, so tests do not see each other's rows. All data
+ * is fictional.
  */
 @SpringBootTest
-@Import(TestcontainersConfiguration.class)
+@Import({ TestcontainersConfiguration.class, RelojDePrueba.class })
 @ActiveProfiles("test")
 @Transactional
-abstract class PersistenciaTestBase {
+public abstract class BaseIntegracionTest {
 
 	protected static final LocalDate HOY = LocalDate.of(2026, 10, 19);
+
+	/** The call must fail with a {@link BusinessException} carrying exactly this error code. */
+	protected static void assertError(ThrowingCallable call, ErrorCode code) {
+		assertThatThrownBy(call)
+				.isInstanceOfSatisfying(BusinessException.class, error -> assertThat(error.getCode()).isEqualTo(code));
+	}
 
 	private static final AtomicLong SEQ = new AtomicLong(1000);
 

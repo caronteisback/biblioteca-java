@@ -11,7 +11,7 @@ REST API for a library system (books, copies, members and loans), built with **J
 | A | Project skeleton, Oracle XE in Docker, Flyway, health endpoint, Testcontainers | Done |
 | B1 | Schema (`V1`), JPA entities and repositories, constraint and query tests | Done |
 | B2a | Business parameters, clock, error model (`{code, message}`), score, fine and alert calculation | Done |
-| B2b | Catalog and members: services and REST controllers | Next |
+| B2b | Catalog and members: services and REST controllers | Done |
 | B2c | Loans, renewals, returns and fines, with concurrency tests | Planned |
 | C | OpenAPI documentation, integration tests for the loan flow, final README | Planned |
 
@@ -77,6 +77,28 @@ controller  ->  service  ->  repository  ->  Oracle XE
 
    Expected: `{"groups":["liveness","readiness"],"status":"UP"}`
 
+## Try the API
+
+With the API running (all data is fictional):
+
+```bash
+# create a book (the ISBN may carry hyphens)
+curl -i -X POST http://localhost:8080/api/v1/libros -H "Content-Type: application/json" \
+  -d '{"isbn":"978-0-306-40615-7","titulo":"El Faro Imaginado","autor":"Autora Ficticia","anioPublicacion":2001}'
+
+# add a copy to book 1 (use the id returned above)
+curl -X POST http://localhost:8080/api/v1/libros/1/ejemplares -H "Content-Type: application/json" -d '{"codigo":"EJ-1"}'
+
+# create a member: the answer carries score 100 and no alerts
+curl -X POST http://localhost:8080/api/v1/socios -H "Content-Type: application/json" \
+  -d '{"nombre":"Rosa Ficticia","email":"rosa@example.org"}'
+
+# list books whose title or author contains "faro", 5 per page
+curl "http://localhost:8080/api/v1/libros?q=faro&size=5"
+```
+
+Every failure answers `{"code": "...", "message": "..."}` with the right status; see [API conventions](docs/api-conventions.md) and the error catalog in [business rules](docs/business-rules.md).
+
 Stop the database with `docker compose down`. To wipe all data and re-run initialization, use `docker compose down -v`.
 
 ## Tests
@@ -93,6 +115,9 @@ Tests start a throwaway Oracle XE 21c container with Testcontainers (Docker must
 - `ScoreCalculatorTests`, `AlertaCalculatorTests`: the score formula and the alerts, including the worked example of the business rules.
 - `GlobalExceptionHandlerTests`: every failure comes out as `{code, message}` with the right status and without internals (SQL, constraint names, stack traces).
 - `ConstraintErrorsTests`, `BibliotecaPropertiesTests`: constraint-to-error translation and the validation of the business parameters at startup.
+- `LibroServiceTests`, `EjemplarServiceTests`, `SocioServiceTests`: the catalog and member rules against real Oracle, each error code checked.
+- `LibroControllerTests`, `EjemplarControllerTests`, `SocioControllerTests`: the HTTP contract (statuses, JSON, validation) with the service mocked.
+- `CatalogoApiTests`: the whole path, HTTP to Oracle, with the real error handler.
 
 ## Key decisions
 

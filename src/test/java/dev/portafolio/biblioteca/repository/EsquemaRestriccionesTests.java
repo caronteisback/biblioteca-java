@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dev.portafolio.biblioteca.BaseIntegracionTest;
 import dev.portafolio.biblioteca.entity.Ejemplar;
 import dev.portafolio.biblioteca.entity.Libro;
 import dev.portafolio.biblioteca.entity.Multa;
@@ -17,7 +18,7 @@ import org.springframework.dao.DataIntegrityViolationException;
  * The rules that must hold even if the application code has a bug: they live in the schema.
  * Each rejected statement is checked by the name of the constraint Oracle reports.
  */
-class EsquemaRestriccionesTests extends PersistenciaTestBase {
+class EsquemaRestriccionesTests extends BaseIntegracionTest {
 
 	@Test
 	void flywayAppliedTheBaseMigration() {

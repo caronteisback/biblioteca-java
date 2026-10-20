@@ -2,6 +2,7 @@ package dev.portafolio.biblioteca.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.portafolio.biblioteca.BaseIntegracionTest;
 import dev.portafolio.biblioteca.entity.Ejemplar;
 import dev.portafolio.biblioteca.entity.Libro;
 import dev.portafolio.biblioteca.entity.EstadoMulta;
@@ -12,7 +13,7 @@ import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 
 /** The queries the services will rely on, against the real schema. */
-class RepositoriosConsultasTests extends PersistenciaTestBase {
+class RepositoriosConsultasTests extends BaseIntegracionTest {
 
 	@Test
 	void findsAMemberByEmailIgnoringCase() {
