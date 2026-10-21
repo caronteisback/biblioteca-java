@@ -17,6 +17,11 @@ public enum ErrorCode {
 	FINE_NOT_FOUND(404, "The fine does not exist."),
 	ENDPOINT_NOT_FOUND(404, "The endpoint does not exist."),
 
+	UNAUTHENTICATED(401, "You must sign in to use this operation."),
+	INVALID_CREDENTIALS(401, "The email or the password is not correct."),
+	FORBIDDEN(403, "Your role is not allowed to use this operation."),
+	TOO_MANY_ATTEMPTS(429, "Too many failed attempts. Try again in a few minutes."),
+
 	METHOD_NOT_ALLOWED(405, "The HTTP method is not allowed for this endpoint."),
 	UNSUPPORTED_MEDIA_TYPE(415, "The content type is not supported. Use application/json."),
 

@@ -12,12 +12,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * The whole path: HTTP, controller, service, JPA and Oracle, with the real error handler. The
  * mocked slices prove the contract of each layer; this proves that they are wired together.
  */
+@WithMockUser(roles = "LIBRARIAN")
 @AutoConfigureMockMvc
 class CatalogoApiTests extends BaseIntegracionTest {
 

@@ -6,7 +6,7 @@ Source of truth for the library domain. Code, tests and the OpenAPI contract mus
 
 In scope: books, copies, members, loans, renewals, returns, fines and a derived reliability score.
 
-Out of scope (on purpose): payments, reservations, member types, notifications (email/SMS), user accounts and roles. Roles (`LIBRARIAN`, `MEMBER`) arrive later with JWT authentication; until then the API is open and meant for local use only.
+Out of scope (on purpose): payments, reservations, member types, notifications (email/SMS) and an operation to manage accounts. Signing in and the two roles (`LIBRARIAN`, `MEMBER`) are described in section 15.
 
 ## 2. Glossary
 
@@ -159,6 +159,10 @@ Every error body has the same shape and never exposes internals (no stack traces
 | 404 | `FINE_NOT_FOUND` | Unknown fine |
 | 404 | `ENDPOINT_NOT_FOUND` | The route does not exist |
 | 405 | `METHOD_NOT_ALLOWED` | Right route, wrong HTTP method |
+| 401 | `UNAUTHENTICATED` | No valid token (missing, malformed, bad signature, expired). One answer for all |
+| 401 | `INVALID_CREDENTIALS` | Wrong email or password, or an account switched off |
+| 403 | `FORBIDDEN` | A valid token whose role may not call the operation |
+| 429 | `TOO_MANY_ATTEMPTS` | Five failed sign-ins in a row for that email: locked for five minutes |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | Request body is not `application/json` |
 | 409 | `COPY_ALREADY_ON_LOAN` | The copy has an active loan |
 | 409 | `LOAN_ALREADY_RETURNED` | Returning or renewing a loan that was already returned |
@@ -191,3 +195,18 @@ Every error body has the same shape and never exposes internals (no stack traces
 | Overdue detection | On query | Scheduled job | Simpler, never stale |
 | Copy availability | Calculated | `estado` column | Cannot disagree with the loans |
 | Dates | Server only | Client-supplied | Prevents backdated records |
+
+## 15. Accounts, roles and sign-in
+
+| Rule | Detail |
+|------|--------|
+| Roles | `LIBRARIAN`: everything. `MEMBER`: the catalog (read) and their own loans, fines, score and alerts |
+| Accounts | A librarian account has no member; a member account belongs to exactly one member, and a member has at most one account. The database enforces both (`CHECK` and unique indexes) |
+| Own data | The member of a request is read from the token, never from a parameter; there is no way to name another member |
+| Password | Between 12 and 128 characters; stored only as a salted BCrypt hash; never in an answer, a log line or the code |
+| Token | JWT, HMAC-SHA256, 60 minutes, one issuer; the application does not start without a key of at least 32 bytes |
+| Sign-in | A wrong email and a wrong password look the same, in the answer and in the time it takes |
+| Lock | Five failures in a row for an email lock it for five minutes, even for the right password; a success clears the count; the count lives in the memory of one instance |
+| Deleting a member | Also deletes their account (a member with loans cannot be deleted anyway) |
+| Creating accounts | Not through the API: the first librarian comes from the environment, and the demo profile creates three accounts |
+

@@ -1,14 +1,23 @@
 package dev.portafolio.biblioteca.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.portafolio.biblioteca.BaseIntegracionTest;
 import dev.portafolio.biblioteca.dto.AlertaCodigo;
+import dev.portafolio.biblioteca.dto.LoginRequest;
 import dev.portafolio.biblioteca.entity.EstadoMulta;
+import dev.portafolio.biblioteca.repository.UsuarioRepository;
+import dev.portafolio.biblioteca.security.SeguridadProperties;
+import dev.portafolio.biblioteca.service.AutenticacionService;
 import dev.portafolio.biblioteca.service.EjemplarService;
+import dev.portafolio.biblioteca.service.LibroService;
+import dev.portafolio.biblioteca.service.UsuarioService;
+import dev.portafolio.biblioteca.repository.SocioRepository;
 import dev.portafolio.biblioteca.service.MultaService;
 import dev.portafolio.biblioteca.service.PrestamoService;
 import dev.portafolio.biblioteca.service.SocioService;
+import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,8 +47,27 @@ class DatosDeEjemploTests extends BaseIntegracionTest {
 	@Autowired
 	private EjemplarService ejemplarService;
 
+	@Autowired
+	private AutenticacionService autenticacion;
+
+	@Autowired
+	private UsuarioRepository usuariosRepo;
+
+	@Autowired
+	private SocioRepository socioRepository;
+
+	@Autowired
+	private UsuarioService usuarioService;
+
+	@Autowired
+	private LibroService libroService;
+
+	@Autowired
+	private SeguridadProperties seguridad;
+
 	@AfterEach
 	void limpiar() {
+		jdbc.update("delete from usuario");
 		jdbc.update("delete from multa");
 		jdbc.update("delete from prestamo");
 		jdbc.update("delete from ejemplar");
@@ -103,6 +131,50 @@ class DatosDeEjemploTests extends BaseIntegracionTest {
 		assertThat(ejemplares.findAll()).anyMatch(e -> !e.isActivo());
 		assertThat(libros.findAll()).allSatisfy(l -> assertThat(l.getIsbn()).matches("978[0-9]{10}"));
 		assertThat(libros.findAll().stream().map(l -> l.getIsbn()).distinct().count()).isEqualTo(20);
+	}
+
+	@Test
+	void theDemoCreatesThreeAccountsThatCanSignInWithThePasswordOfTheEnvironment() {
+		datos.cargar();
+
+		assertThat(usuariosRepo.count()).isEqualTo(3);
+		var bibliotecaria = autenticacion.entrar(new LoginRequest("bibliotecaria@example.org", seguridad.demoPassword()));
+		var rosa = autenticacion.entrar(new LoginRequest("rosa.valdivia@example.org", seguridad.demoPassword()));
+		var mateo = autenticacion.entrar(new LoginRequest("mateo.quispe@example.org", seguridad.demoPassword()));
+
+		assertThat(bibliotecaria.usuario().rol().name()).isEqualTo("LIBRARIAN");
+		assertThat(rosa.usuario().rol().name()).isEqualTo("MEMBER");
+		assertThat(rosa.usuario().socio().nombre()).isEqualTo("Rosa Valdivia");
+		assertThat(mateo.usuario().socio().alertas()).anyMatch(a -> a.code() == AlertaCodigo.PENDING_FINE);
+		assertThat(mateo.usuario().socio().score()).isLessThan(100);
+	}
+
+	@Test
+	void loadingTwiceDoesNotDuplicateTheAccounts() {
+		datos.cargar();
+		datos.cargar();
+
+		assertThat(usuariosRepo.count()).isEqualTo(3);
+	}
+
+	@Test
+	void anExistingDemoDatabaseWithoutAccountsGetsThemOnTheNextStart() {
+		datos.cargar();
+		jdbc.update("delete from usuario");
+
+		assertThat(datos.cargar()).as("the catalog is not loaded again").isFalse();
+
+		assertThat(usuariosRepo.count()).isEqualTo(3);
+	}
+
+	@Test
+	void withoutAPasswordTheDemoStopsInsteadOfCreatingAccountsWithAGuessableOne() {
+		SeguridadProperties sinPassword = new SeguridadProperties("k".repeat(32), Duration.ofMinutes(60), 5, Duration.ofMinutes(5), null, null, "");
+		DatosDeEjemplo sinClave = new DatosDeEjemplo(libros, libroService, ejemplarService, socioService, prestamoService, multaService,
+				jdbc, socioRepository, usuariosRepo, usuarioService, sinPassword);
+
+		assertThatThrownBy(sinClave::cargar).isInstanceOf(IllegalStateException.class).hasMessageContaining("BIBLIOTECA_DEMO_PASSWORD");
+		assertThat(usuariosRepo.count()).isZero();
 	}
 
 }

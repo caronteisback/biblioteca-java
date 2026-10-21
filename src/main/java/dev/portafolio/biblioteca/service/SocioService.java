@@ -12,6 +12,7 @@ import dev.portafolio.biblioteca.exception.ErrorCode;
 import dev.portafolio.biblioteca.repository.MultaRepository;
 import dev.portafolio.biblioteca.repository.PrestamoRepository;
 import dev.portafolio.biblioteca.repository.SocioRepository;
+import dev.portafolio.biblioteca.repository.UsuarioRepository;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SocioService {
 
 	private final SocioRepository socios;
+	private final UsuarioRepository usuarios;
 	private final PrestamoRepository prestamos;
 	private final MultaRepository multas;
 	private final ScoreCalculator score;
@@ -99,6 +101,7 @@ public class SocioService {
 		if (prestamos.existsBySocioId(id)) {
 			throw new BusinessException(ErrorCode.MEMBER_HAS_HISTORY);
 		}
+		usuarios.deleteBySocioId(id);
 		socios.delete(socio);
 	}
 

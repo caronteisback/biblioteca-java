@@ -5,7 +5,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import dev.portafolio.biblioteca.BaseIntegracionTest;
+import dev.portafolio.biblioteca.entity.Rol;
 import dev.portafolio.biblioteca.exception.ErrorCode;
+import dev.portafolio.biblioteca.security.ReglasDeAcceso;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
@@ -27,6 +29,7 @@ import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpMethod;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -55,9 +58,10 @@ class OpenApiDocumentTests extends BaseIntegracionTest {
 			"POST /api/v1/socios/{id}/desactivar", "POST /api/v1/socios/{id}/reactivar",
 			"GET /api/v1/prestamos", "POST /api/v1/prestamos", "GET /api/v1/prestamos/{id}",
 			"POST /api/v1/prestamos/{id}/renovacion", "POST /api/v1/prestamos/{id}/devolucion",
-			"GET /api/v1/multas", "GET /api/v1/multas/{id}", "POST /api/v1/multas/{id}/pago"));
+			"GET /api/v1/multas", "GET /api/v1/multas/{id}", "POST /api/v1/multas/{id}/pago",
+			"POST /api/v1/auth/login", "GET /api/v1/me", "GET /api/v1/me/prestamos", "GET /api/v1/me/multas"));
 
-	private static final Set<String> ETIQUETAS = Set.of("Books", "Copies", "Members", "Loans", "Fines");
+	private static final Set<String> ETIQUETAS = Set.of("Authentication", "Account", "Books", "Copies", "Members", "Loans", "Fines");
 
 	@Autowired
 	private MockMvc mvc;
@@ -114,7 +118,7 @@ class OpenApiDocumentTests extends BaseIntegracionTest {
 		assertThat(operaciones.values().stream().map(Operation::getOperationId).toList())
 				.doesNotContainNull()
 				.doesNotHaveDuplicates()
-				.allMatch(id -> id.matches("[a-z]+([A-Z][a-z]+)+"), "camelCase verb and noun, with no numeric suffix");
+				.allMatch(id -> id.equals("login") || id.matches("[a-z]+([A-Z][a-z]+)+"), "camelCase verb and noun (or the single verb login), with no numeric suffix");
 		assertThat(operaciones.get("POST /api/v1/prestamos").getOperationId()).isEqualTo("createLoan");
 		assertThat(operaciones.get("POST /api/v1/prestamos/{id}/renovacion").getOperationId()).isEqualTo("renewLoan");
 		assertThat(operaciones.get("POST /api/v1/prestamos/{id}/devolucion").getOperationId()).isEqualTo("returnLoan");
@@ -135,6 +139,46 @@ class OpenApiDocumentTests extends BaseIntegracionTest {
 	@Test
 	void everyAnswerIsDeclaredAsJsonNeverAsAnyMediaType() throws Exception {
 		assertThat(generado()).doesNotContain("'*/*'");
+	}
+
+	@Test
+	void theBearerSchemeIsDeclaredAndEveryOperationStatesWhoMayCallIt() throws Exception {
+		OpenAPI api = documento();
+
+		assertThat(api.getComponents().getSecuritySchemes()).containsKey("bearerAuth");
+		assertThat(api.getComponents().getSecuritySchemes().get("bearerAuth").getScheme()).isEqualTo("bearer");
+		assertThat(api.getSecurity()).hasSize(1);
+		operaciones(api).forEach((nombre, operacion) -> {
+			String[] partes = nombre.split(" ", 2);
+			var regla = ReglasDeAcceso.para(HttpMethod.valueOf(partes[0]), partes[1]).orElseThrow();
+			if (regla.esPublica()) {
+				assertThat(operacion.getSecurity()).as("security of %s", nombre).isEmpty();
+				// Signing in has no 403, and its 401 is "wrong credentials", written by hand, not "you must sign in".
+				assertThat(operacion.getResponses()).as("responses of %s", nombre).doesNotContainKey("403");
+				return;
+			}
+			var roles = operacion.getSecurity().stream().map(r -> r.get("bearerAuth").get(0)).toList();
+			assertThat(roles).as("roles of %s", nombre).containsExactlyInAnyOrderElementsOf(regla.roles().stream().map(Enum::name).toList());
+			assertThat(operacion.getResponses()).as("responses of %s", nombre).containsKey("401");
+			if (regla.roles().size() < Rol.values().length) {
+				assertThat(operacion.getResponses()).as("responses of %s", nombre).containsKey("403");
+			} else {
+				assertThat(operacion.getResponses()).as("responses of %s", nombre).doesNotContainKey("403");
+			}
+		});
+	}
+
+	@Test
+	void theAccountOperationsOfAMemberAreOnlyForMembers() throws Exception {
+		Map<String, Operation> operaciones = operaciones(documento());
+
+		for (String clave : List.of("GET /api/v1/me/prestamos", "GET /api/v1/me/multas")) {
+			assertThat(operaciones.get(clave).getSecurity()).as(clave).hasSize(1);
+			assertThat(operaciones.get(clave).getSecurity().get(0).get("bearerAuth")).containsExactly("MEMBER");
+		}
+		assertThat(operaciones.get("GET /api/v1/me/prestamos").getParameters().stream().map(p -> p.getName()).toList())
+				.as("a member never says whose loans: there is no socioId parameter")
+				.doesNotContain("socioId");
 	}
 
 	@Test

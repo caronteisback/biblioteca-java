@@ -6,9 +6,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
 import com.networknt.schema.Error;
-import dev.portafolio.biblioteca.BaseIntegracionTest;
+import dev.portafolio.biblioteca.BaseApiSegura;
 import dev.portafolio.biblioteca.entity.Prestamo;
 import dev.portafolio.biblioteca.entity.Socio;
+import dev.portafolio.biblioteca.entity.Usuario;
 import dev.portafolio.biblioteca.exception.ErrorCode;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -18,13 +19,13 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
@@ -42,24 +43,31 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
  * <li>the status is one the contract lists for the operation, and the body has the shape of its schema,
  * with no field the contract does not name;
  * <li>an error carries one of the codes the contract lists for that status, and a 201 carries the headers it lists;
- * <li>the bodies sent are valid against the request schema of the contract.
+ * <li>the bodies sent are valid against the request schema of the contract;
+ * <li>every operation allows exactly the roles the contract declares, and refuses the others with the documented status.
  * </ul>
+ * The calls carry a real token from the real login, as a client would.
  * At the end, every operation of the contract must have been called with its success status, so adding an
  * operation without a scenario here fails the build.
  */
 @AutoConfigureMockMvc
-class ContratoTests extends BaseIntegracionTest {
+class ContratoTests extends BaseApiSegura {
 
 	private static final ObjectMapper JSON = new ObjectMapper();
 	private static final ContratoVigente CONTRATO = new ContratoVigente();
 	private static final Set<String> LLAMADAS = new LinkedHashSet<>();
 
-	@Autowired
-	private MockMvc mvc;
+	/** The token the next calls carry; null means no sign-in. Every test starts as a librarian. */
+	private String tokenActual;
 
 	@Autowired
 	@Qualifier("requestMappingHandlerMapping")
 	private RequestMappingHandlerMapping mapeos;
+
+	@BeforeEach
+	void entrarComoBibliotecario() throws Exception {
+		tokenActual = token(bibliotecario());
+	}
 
 	// ---- the pinned copy itself
 
@@ -169,18 +177,98 @@ class ContratoTests extends BaseIntegracionTest {
 		llamar(HttpMethod.GET, "/api/v1/libros", null, 400, "size", "0");
 		llamar(HttpMethod.GET, "/api/v1/prestamos/abc", null, 400);
 
-		MvcResult tipo = mvc.perform(MockMvcRequestBuilders.post("/api/v1/libros").contentType(MediaType.TEXT_PLAIN).content("texto"))
+		MvcResult tipo = mvc.perform(MockMvcRequestBuilders.post("/api/v1/libros").header("Authorization", bearer(tokenActual)).contentType(MediaType.TEXT_PLAIN).content("texto"))
 				.andReturn();
 		assertThat(tipo.getResponse().getStatus()).isEqualTo(415);
 		verificarError(tipo, "/api/v1/libros", HttpMethod.POST);
 
 		// These two can answer any URL, so no operation lists them: only the shape of the answer is checked.
-		MvcResult noExiste = mvc.perform(MockMvcRequestBuilders.get("/api/v1/no-existe")).andReturn();
+		MvcResult noExiste = mvc.perform(MockMvcRequestBuilders.get("/api/v1/no-existe").header("Authorization", bearer(tokenActual))).andReturn();
 		assertThat(noExiste.getResponse().getStatus()).isEqualTo(404);
 		validarErrorGenerico(noExiste, "ENDPOINT_NOT_FOUND");
-		MvcResult metodo = mvc.perform(MockMvcRequestBuilders.patch("/api/v1/libros/1")).andReturn();
+		MvcResult metodo = mvc.perform(MockMvcRequestBuilders.patch("/api/v1/libros/1").header("Authorization", bearer(tokenActual))).andReturn();
 		assertThat(metodo.getResponse().getStatus()).isEqualTo(405);
 		validarErrorGenerico(metodo, "METHOD_NOT_ALLOWED");
+	}
+
+	@Test
+	void signingInFollowsTheContract() throws Exception {
+		Usuario bibliotecario = bibliotecario();
+		tokenActual = null;
+		String credenciales = "{\"email\":\"%s\",\"password\":\"%s\"}";
+
+		llamar(HttpMethod.POST, "/api/v1/auth/login", credenciales.formatted(bibliotecario.getEmail(), PASSWORD), 200);
+		llamar(HttpMethod.POST, "/api/v1/auth/login", credenciales.formatted(bibliotecario.getEmail(), "wrong-password-123"), 401);
+		llamarInvalido(HttpMethod.POST, "/api/v1/auth/login", "{}", 400);
+
+		String bloqueado = "bloqueado" + System.nanoTime() + "@example.org";
+		for (int i = 0; i < 5; i++) {
+			llamar(HttpMethod.POST, "/api/v1/auth/login", credenciales.formatted(bloqueado, "wrong-password-123"), 401);
+		}
+		llamar(HttpMethod.POST, "/api/v1/auth/login", credenciales.formatted(bloqueado, PASSWORD), 429);
+	}
+
+	@Test
+	void theAccountOfAMemberFollowsTheContract() throws Exception {
+		Socio socio = socio();
+		prestamos.saveAndFlush(prestamo(ejemplar(), socio, HOY, 14));
+		tokenActual = token(cuentaDe(socio));
+
+		llamar(HttpMethod.GET, "/api/v1/me", null, 200);
+		llamar(HttpMethod.GET, "/api/v1/me/prestamos", null, 200, "activo", "true", "size", "5");
+		llamar(HttpMethod.GET, "/api/v1/me/multas", null, 200, "estado", "PENDING");
+		llamar(HttpMethod.GET, "/api/v1/libros", null, 200);
+		llamarRefusado(HttpMethod.GET, "/api/v1/socios", "/api/v1/socios", null, 403);
+		llamarRefusado(HttpMethod.DELETE, "/api/v1/libros/{id}", "/api/v1/libros/1", null, 403);
+
+		tokenActual = token(bibliotecario());
+		llamar(HttpMethod.GET, "/api/v1/me", null, 200);
+		llamarRefusado(HttpMethod.GET, "/api/v1/me/prestamos", "/api/v1/me/prestamos", null, 403);
+	}
+
+	@Test
+	void withoutATokenEveryOperationAnswersWithTheDocumented401() throws Exception {
+		tokenActual = null;
+
+		llamarRefusado(HttpMethod.GET, "/api/v1/libros", "/api/v1/libros", null, 401);
+		llamarRefusado(HttpMethod.POST, "/api/v1/prestamos", "/api/v1/prestamos", "{}", 401);
+		llamarRefusado(HttpMethod.GET, "/api/v1/me", "/api/v1/me", null, 401);
+	}
+
+	@Test
+	void everyOperationAllowsExactlyTheRolesTheContractDeclares() throws Exception {
+		String deBibliotecario = tokenActual;
+		String deSocio = token(cuentaDe(socio()));
+		List<String> problemas = new ArrayList<>();
+		int[] comprobadas = { 0 };
+
+		CONTRATO.documento().get("paths").properties().forEach(ruta -> ruta.getValue().properties().forEach(metodo -> {
+			JsonNode operacion = metodo.getValue();
+			List<String> roles = new ArrayList<>();
+			operacion.get("security").forEach(requisito -> roles.add(requisito.get("bearerAuth").get(0).asText()));
+			boolean publica = roles.isEmpty();
+			String url = ruta.getKey().replaceAll("[{][^}]+[}]", "999999");
+			String cuerpo = operacion.has("requestBody") ? "{}" : null;
+			HttpMethod http = HttpMethod.valueOf(metodo.getKey().toUpperCase(Locale.ROOT));
+
+			for (String actor : new String[] { null, "LIBRARIAN", "MEMBER" }) {
+				tokenActual = actor == null ? null : actor.equals("LIBRARIAN") ? deBibliotecario : deSocio;
+				try {
+					int estado = enviar(http, url, cuerpo).getResponse().getStatus();
+					boolean permitido = publica || roles.contains(actor);
+					boolean correcto = actor == null && !publica ? estado == 401 : !permitido ? estado == 403 : estado != 401 && estado != 403;
+					comprobadas[0]++;
+					if (!correcto) {
+						problemas.add("%s as %s answered %d (roles in the contract: %s)".formatted(operacion.get("operationId").asText(), actor, estado, roles));
+					}
+				} catch (Exception e) {
+					problemas.add(operacion.get("operationId").asText() + " as " + actor + " failed: " + e);
+				}
+			}
+		}));
+
+		assertThat(problemas).isEmpty();
+		assertThat(comprobadas[0]).as("30 operations, three actors each").isEqualTo(90);
 	}
 
 	@AfterAll
@@ -203,15 +291,26 @@ class ContratoTests extends BaseIntegracionTest {
 		MvcResult resultado = enviar(metodo, url, cuerpo, parametros);
 		assertThat(resultado.getResponse().getStatus()).as("%s %s -> %s", metodo, url, resultado.getResponse().getContentAsString())
 				.isEqualTo(estado);
-		verificar(metodo, resultado, cuerpo, true);
+		verificar(metodo, null, resultado, cuerpo, true);
 		return resultado;
+	}
+
+	/**
+	 * A call the security filter refuses (401, 403) never reaches a controller, so the test names the operation
+	 * it was aimed at and the answer is still checked against what the contract lists for it.
+	 */
+	private void llamarRefusado(HttpMethod metodo, String plantilla, String url, String cuerpo, int estado) throws Exception {
+		MvcResult resultado = enviar(metodo, url, cuerpo);
+		assertThat(resultado.getResponse().getStatus()).as("%s %s -> %s", metodo, url, resultado.getResponse().getContentAsString())
+				.isEqualTo(estado);
+		verificar(metodo, plantilla, resultado, cuerpo, false);
 	}
 
 	/** Like {@link #llamar}, for a request body that breaks the request schema on purpose. */
 	private void llamarInvalido(HttpMethod metodo, String url, String cuerpo, int estado) throws Exception {
 		MvcResult resultado = enviar(metodo, url, cuerpo);
 		assertThat(resultado.getResponse().getStatus()).isEqualTo(estado);
-		verificar(metodo, resultado, cuerpo, false);
+		verificar(metodo, null, resultado, cuerpo, false);
 	}
 
 	private MvcResult enviar(HttpMethod metodo, String url, String cuerpo, String... parametros) throws Exception {
@@ -222,11 +321,15 @@ class ContratoTests extends BaseIntegracionTest {
 		if (cuerpo != null) {
 			peticion.contentType(MediaType.APPLICATION_JSON).content(cuerpo);
 		}
+		if (tokenActual != null) {
+			peticion.header("Authorization", bearer(tokenActual));
+		}
 		return mvc.perform(peticion).andReturn();
 	}
 
-	private void verificar(HttpMethod metodo, MvcResult resultado, String cuerpoEnviado, boolean cuerpoValido) throws Exception {
-		String plantilla = (String) resultado.getRequest().getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+	private void verificar(HttpMethod metodo, String plantillaPedida, MvcResult resultado, String cuerpoEnviado, boolean cuerpoValido) throws Exception {
+		String alcanzada = (String) resultado.getRequest().getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+		String plantilla = alcanzada != null ? alcanzada : plantillaPedida;
 		assertThat(plantilla).as("the request did not reach an operation").isNotNull();
 		JsonNode operacion = CONTRATO.documento().at("/paths").get(plantilla).get(metodo.name().toLowerCase(Locale.ROOT));
 		assertThat(operacion).as("%s %s is not in the contract", metodo, plantilla).isNotNull();

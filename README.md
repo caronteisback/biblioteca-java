@@ -27,14 +27,14 @@ The rules are written in [docs/business-rules.md](docs/business-rules.md) and ev
 - **Concurrency is designed and tested, not hoped for.** Row locks are taken in one fixed order (member, copy, loan) with a 5-second cap. Nine tests run real threads against Oracle, and removing the locks makes six of them fail, so they do detect the races. An experiment also showed that one lock I had planned was not needed, and the code and docs say so.
 - **Derived data is never stored.** Score, alerts and copy availability are calculated from the history, so they cannot disagree with it.
 - **One error shape.** Every failure answers `{ "code": "...", "message": "..." }` with a stable code and the right status (400, 404, 405, 409, 415, 422, 500), and nothing internal (SQL, constraint names, stack traces) reaches the client.
-- **Real database in tests.** 312 tests run on Oracle XE in Testcontainers, not on an in-memory substitute that hides engine behavior.
+- **Real database in tests.** 398 tests run on Oracle XE in Testcontainers, not on an in-memory substitute that hides engine behavior.
 - **Design first.** Business rules, process flows, sequence diagrams, class and ER diagrams, query plans checked with `DBMS_XPLAN`, and architecture decision records live in [`docs/`](docs/README.md).
 
 ## Quick start
 
 Requirements: JDK 17 or newer, Docker Desktop (Compose v2). No Maven installation is needed: the repository includes the wrapper.
 
-1. Create your local configuration and set your own passwords (letters and digits only):
+1. Create your local configuration and set your own values: the database passwords (letters and digits only), `JWT_SECRET` (a random value of at least 32 characters, for example `openssl rand -base64 48`) and, to be able to sign in, `BIBLIOTECA_ADMIN_EMAIL` and `BIBLIOTECA_ADMIN_PASSWORD` (at least 12 characters), which create the first librarian on the first start:
 
    ```bash
    cp .env.example .env
@@ -69,32 +69,40 @@ IntelliJ IDEA: the project uses Lombok. Reload the Maven project and enable *Set
 
 ## Try the API
 
-With the API running:
+With the API running. Every operation but the sign-in needs a token, so sign in first (with the librarian you set in `.env`):
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login -H "Content-Type: application/json" \
+  -d '{"email":"<BIBLIOTECA_ADMIN_EMAIL>","password":"<BIBLIOTECA_ADMIN_PASSWORD>"}' | sed 's/.*"token":"\([^"]*\)".*/\1/')
+AUTH="Authorization: Bearer $TOKEN"
+```
+
+Then add `-H "$AUTH"` to each call:
 
 ```bash
 # create a book (the ISBN may carry hyphens)
-curl -i -X POST http://localhost:8080/api/v1/libros -H "Content-Type: application/json" \
+curl -i -X POST http://localhost:8080/api/v1/libros -H "$AUTH" -H "Content-Type: application/json" \
   -d '{"isbn":"978-0-306-40615-7","titulo":"El Faro Imaginado","autor":"Autora Ficticia","anioPublicacion":2001}'
 
 # add a copy to book 1 (use the id returned above)
-curl -X POST http://localhost:8080/api/v1/libros/1/ejemplares -H "Content-Type: application/json" -d '{"codigo":"EJ-1"}'
+curl -X POST http://localhost:8080/api/v1/libros/1/ejemplares -H "$AUTH" -H "Content-Type: application/json" -d '{"codigo":"EJ-1"}'
 
 # create a member: the answer carries score 100 and no alerts
-curl -X POST http://localhost:8080/api/v1/socios -H "Content-Type: application/json" \
+curl -X POST http://localhost:8080/api/v1/socios -H "$AUTH" -H "Content-Type: application/json" \
   -d '{"nombre":"Rosa Ficticia","email":"rosa@example.org"}'
 
 # lend copy 1 to member 1 (the due date is 14 days from today, set by the server)
-curl -X POST http://localhost:8080/api/v1/prestamos -H "Content-Type: application/json" -d '{"socioId":1,"ejemplarId":1}'
+curl -X POST http://localhost:8080/api/v1/prestamos -H "$AUTH" -H "Content-Type: application/json" -d '{"socioId":1,"ejemplarId":1}'
 
 # renew loan 1 (up to 3 times), then return it
-curl -X POST http://localhost:8080/api/v1/prestamos/1/renovacion
-curl -X POST http://localhost:8080/api/v1/prestamos/1/devolucion
+curl -X POST -H "$AUTH" http://localhost:8080/api/v1/prestamos/1/renovacion
+curl -X POST -H "$AUTH" http://localhost:8080/api/v1/prestamos/1/devolucion
 
 # the member carries a score and alerts calculated from the history
-curl http://localhost:8080/api/v1/socios/1
+curl -H "$AUTH" http://localhost:8080/api/v1/socios/1
 
 # list books whose title or author contains "faro", 5 per page
-curl "http://localhost:8080/api/v1/libros?q=faro&size=5"
+curl -H "$AUTH" "http://localhost:8080/api/v1/libros?q=faro&size=5"
 ```
 
 | Resource | Main endpoints under `/api/v1` |
@@ -104,6 +112,8 @@ curl "http://localhost:8080/api/v1/libros?q=faro&size=5"
 | Members | `POST/GET /socios`, `GET/PUT/DELETE /socios/{id}`, `POST /socios/{id}/desactivar` and `/reactivar` |
 | Loans | `POST/GET /prestamos`, `GET /prestamos/{id}`, `POST /prestamos/{id}/renovacion` and `/devolucion` |
 | Fines | `GET /multas`, `GET /multas/{id}`, `POST /multas/{id}/pago` |
+| Sign-in | `POST /auth/login` (the only operation without a token) |
+| Account | `GET /me`, `GET /me/prestamos`, `GET /me/multas` (a member sees only their own data) |
 
 Statuses, pagination, filters and CORS are in [API conventions](docs/api-conventions.md); the error catalog is in [business rules](docs/business-rules.md#14-error-catalog).
 
@@ -129,6 +139,24 @@ The authoritative description of the API lives in its own repository, [bibliotec
 
 To adopt a new version of the contract, copy its `openapi.yaml` and update the three lines of `contrato.properties` in the same commit. To change the API, change the contract first (a new tagged version) and then the code.
 
+## Sign-in and roles
+
+Every operation but `POST /api/v1/auth/login` needs `Authorization: Bearer <token>`. The token is a JWT signed with HMAC-SHA256, valid for 60 minutes, and the API stores no session.
+
+| Role | May |
+|------|-----|
+| `LIBRARIAN` | Everything the API offers |
+| `MEMBER` | Read the catalog, and only **their own** data: `/me`, `/me/prestamos`, `/me/multas`. The member is read from the token, never from the request, so there is no way to ask for another member's data |
+
+Who may call what is one list in the code (`ReglasDeAcceso`), read both by the filter chain, to enforce it, and by the OpenAPI description, to publish it. Anything that list does not name under `/api` is for librarians only, so a new endpoint is closed to members until someone opens it on purpose. A test walks every operation of the contract with no token, a librarian's and a member's, and checks the answer is the one the contract declares.
+
+- **Accounts** live in the `usuario` table with a salted BCrypt hash; no answer ever carries a password or a hash. They are not created through the API: the first librarian comes from `BIBLIOTECA_ADMIN_EMAIL` and `BIBLIOTECA_ADMIN_PASSWORD` when there are no accounts, and the demo profile creates a librarian and two members.
+- **Guessing a password is slowed down:** a wrong email and a wrong password get the same answer and take about the same time, and five failures in a row lock that email for five minutes.
+- **Refused calls** use the usual `{ "code", "message" }` shape: `401 UNAUTHENTICATED` (no token, a bad signature, an expired one: the answer never says which), `403 FORBIDDEN`, `401 INVALID_CREDENTIALS`, `429 TOO_MANY_ATTEMPTS`.
+- **The key** is `JWT_SECRET`. It has no default: without at least 32 bytes the application does not start.
+
+Limits, on purpose: there is no operation to create or manage accounts; a token stays valid until it expires even if its account is switched off; and the lock counts failures in the memory of one instance (several instances would each count their own).
+
 ## Run in a container
 
 The image uses JDK 17, runs as a user without privileges and has a health check. It contains no secret: the database comes from the environment, and the `prod` profile (the image default) stops at startup if a variable is missing.
@@ -140,6 +168,7 @@ docker run -d --name biblioteca-api --network biblioteca-java_default -p 8080:80
   -e DB_URL=jdbc:oracle:thin:@//oracle:1521/XEPDB1 \
   -e APP_USER=biblioteca \
   -e APP_USER_PASSWORD=<the value in your .env> \
+  -e JWT_SECRET=<a random value of at least 32 characters> \
   biblioteca-java
 ```
 
@@ -170,7 +199,7 @@ controller  ->  service  ->  repository  ->  Oracle XE
 ./mvnw verify
 ```
 
-312 tests. They start a throwaway Oracle XE 21c container with Testcontainers (Docker must be running; the first run downloads the image), share one container for the whole run and never touch the compose database.
+398 tests. They start a throwaway Oracle XE 21c container with Testcontainers (Docker must be running; the first run downloads the image), share one container for the whole run and never touch the compose database.
 
 | Level | What it proves |
 |-------|----------------|
@@ -205,7 +234,8 @@ Continuous integration runs the same command on every push, and also checks that
 - Every query uses bind variables; input is validated; errors never expose SQL, constraint names or stack traces.
 - CORS allows only the listed origins, never a wildcard (a wildcard stops the startup).
 - `/actuator/health` hides component details; only `health` and `info` are exposed.
-- The API is open for now. Authentication (JWT) and the roles `LIBRARIAN` and `MEMBER` arrive in a later phase, so do not expose it to a network.
+- Every operation but the sign-in needs a JWT, and a member can only reach their own data (see [Sign-in and roles](#sign-in-and-roles)). Passwords are stored as salted BCrypt hashes, repeated failures lock an email, and refused calls reveal nothing about why.
+- The signing key comes from the environment and the application refuses to start without a strong one. Use HTTPS in front of the API in any real deployment: a bearer token sent in clear can be copied.
 
 ## Documentation
 
@@ -214,7 +244,8 @@ Everything is in [`docs/`](docs/README.md): [business rules](docs/business-rules
 ## Roadmap
 
 - **Next:** the Python implementation of the same API (`biblioteca-python`), checked against the same contract.
-- **Later:** authentication with JWT and roles, a complete `docker compose` with every component, and a browser frontend.
+- **Done around it:** the [browser panel](https://github.com/caronteisback/biblioteca-web) and the [whole system in one command](https://github.com/caronteisback/biblioteca).
+- **Later:** an operation to manage accounts, and tokens that can be revoked.
 
 ## Troubleshooting
 

@@ -1,0 +1,5 @@
+# Settings of the tests only. The secret and the password are made up for them and protect nothing.
+biblioteca:
+  seguridad:
+    jwt-secreto: secret-of-the-tests-at-least-32-bytes-long-0123456789
+    demo-password: demo-password-of-the-tests

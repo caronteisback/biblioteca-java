@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.CannotAcquireLockException;
@@ -34,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Every failure must come out as {code, message} with the right status and without internals.
  * A throwaway controller provokes each kind of failure; no database is involved.
  */
+@AutoConfigureMockMvc(addFilters = false)
 @WebMvcTest(controllers = GlobalExceptionHandlerTests.ErrorProbe.class)
 @Import({ GlobalExceptionHandlerTests.ErrorProbe.class, GlobalExceptionHandler.class })
 @ActiveProfiles("test")

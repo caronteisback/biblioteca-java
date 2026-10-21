@@ -45,6 +45,18 @@ biblioteca:
       - http://localhost:8000
       - http://localhost:5173
       - http://127.0.0.1:5173
+  # Sign-in. The secret has no default: JWT_SECRET (from .env or the environment) must have at least 32 bytes
+  # or the application does not start. Tokens last an hour; five failures in a row lock an email for five minutes.
+  # The first librarian is created from BIBLIOTECA_ADMIN_EMAIL and BIBLIOTECA_ADMIN_PASSWORD when there are no accounts.
+  seguridad:
+    jwt-secreto: ${JWT_SECRET:}
+    jwt-duracion: 60m
+    intentos-maximos: 5
+    bloqueo: 5m
+    admin-email: ${BIBLIOTECA_ADMIN_EMAIL:}
+    admin-password: ${BIBLIOTECA_ADMIN_PASSWORD:}
+    # Password of the demo accounts. Only the demo profile reads it; it is never in the code.
+    demo-password: ${BIBLIOTECA_DEMO_PASSWORD:}
 
 # The API description and Swagger UI are off by default. The dev profile turns them on; a real
 # deployment keeps them off unless it decides to publish them.

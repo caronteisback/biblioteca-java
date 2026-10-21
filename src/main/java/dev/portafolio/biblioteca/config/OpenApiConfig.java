@@ -1,7 +1,9 @@
 package dev.portafolio.biblioteca.config;
 
 import dev.portafolio.biblioteca.dto.ErrorResponse;
+import dev.portafolio.biblioteca.entity.Rol;
 import dev.portafolio.biblioteca.exception.ErrorCode;
+import dev.portafolio.biblioteca.security.ReglasDeAcceso;
 import io.swagger.v3.core.converter.ModelConverters;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -15,6 +17,8 @@ import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.oas.models.tags.Tag;
 import java.util.ArrayList;
@@ -30,6 +34,7 @@ import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 
 /**
  * The OpenAPI description of the API, built from the code so it cannot disagree with it.
@@ -47,7 +52,7 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
 	/** Version of the contract (not of the artifact). Raise it when the API changes; see biblioteca-contrato. */
-	static final String API_VERSION = "0.1.1";
+	static final String API_VERSION = "0.2.1";
 
 	@Bean
 	OpenAPI bibliotecaOpenApi() {
@@ -62,6 +67,8 @@ public class OpenApiConfig {
 								**Errors.** Every failure answers `{ "code": "...", "message": "..." }`. The `code` is stable and \
 								meant for programs; the `message` is English text for people. Each operation lists the codes it can return.
 
+								**Authentication.** Every operation but `login` needs a bearer token: `Authorization: Bearer <token>`. Get one with \n								`POST /api/v1/auth/login`; it is valid for 60 minutes. There are two roles. A `LIBRARIAN` can do everything. A `MEMBER` \n								can read the catalog and only their own data (`/api/v1/me`). Each operation lists the roles that may call it. Without a \n								token the answer is `401 UNAUTHENTICATED`; with the wrong role, `403 FORBIDDEN`.
+
 								**Dates** are days (`yyyy-MM-dd`) in the `America/Lima` zone and always come from the server, never \
 								from the client.
 
@@ -70,6 +77,8 @@ public class OpenApiConfig {
 						.license(new License().name("MIT").url("https://opensource.org/license/mit")))
 				.servers(List.of(new Server().url("http://localhost:8080").description("Local development")))
 				.tags(List.of(
+						new Tag().name("Authentication").description("Signing in."),
+						new Tag().name("Account").description("What the signed-in user can see about themselves."),
 						new Tag().name("Books").description("Titles of the catalog, identified by ISBN."),
 						new Tag().name("Copies").description("Physical copies of a book. Loans are made on copies."),
 						new Tag().name("Members").description("People who can borrow, with their score and alerts."),
@@ -137,6 +146,15 @@ public class OpenApiConfig {
 				}
 			});
 
+			// Who may call each operation comes from the same rules that the filter chain enforces, and the 401 and
+			// 403 answers follow from them. This runs before the examples are registered, so the new codes get theirs.
+			componentes.addSecuritySchemes("bearerAuth", new SecurityScheme()
+					.type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")
+					.description("The token that `login` returns, sent as `Authorization: Bearer <token>`."));
+			openApi.setSecurity(List.of(new SecurityRequirement().addList("bearerAuth")));
+			openApi.getPaths().forEach((ruta, item) -> item.readOperationsMap().forEach((metodo, operacion) ->
+					ReglasDeAcceso.para(HttpMethod.valueOf(metodo.name()), ruta).ifPresent(regla -> documentarAcceso(operacion, regla))));
+
 			// One shared example per error code, referenced by every operation that can return it. Two codes can
 			// answer any URL (unknown route, wrong method), so no operation lists them and they have no example.
 			Set<String> usados = ejemplosUsados(openApi);
@@ -151,11 +169,27 @@ public class OpenApiConfig {
 				valor.put("message", entrada.message());
 				ejemplos.put(entrada.name(), new Example().summary(entrada.name()).value(valor));
 			}
-
-			// The API has no authentication yet. Saying so explicitly is different from saying nothing: it is
-			// part of the contract, and it will change when the JWT arrives.
-			openApi.setSecurity(new ArrayList<>());
 		};
+	}
+
+	/**
+	 * The roles of an operation as security requirements (one per role: any of them is enough) and the answers that
+	 * follow: 401 when a sign-in is needed, 403 when some role is not allowed. A public operation lists no requirement.
+	 */
+	private static void documentarAcceso(Operation operacion, ReglasDeAcceso.Regla regla) {
+		if (regla.esPublica()) {
+			operacion.setSecurity(new ArrayList<>());
+			return;
+		}
+		List<SecurityRequirement> requisitos = new ArrayList<>();
+		regla.roles().stream().sorted().forEach(rol -> requisitos.add(new SecurityRequirement().addList("bearerAuth", rol.name())));
+		operacion.setSecurity(requisitos);
+		Set<ErrorCode> errores = new LinkedHashSet<>();
+		errores.add(ErrorCode.UNAUTHENTICATED);
+		if (regla.roles().size() < Rol.values().length) {
+			errores.add(ErrorCode.FORBIDDEN);
+		}
+		agregarErrores(operacion, errores);
 	}
 
 	/** Names of the shared examples that some operation points to. */

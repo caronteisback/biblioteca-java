@@ -2,6 +2,28 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-10-21
+
+**Breaking:** every operation but `POST /api/v1/auth/login` now needs a bearer token (contract biblioteca-contrato v0.2.1).
+
+### Added
+
+- **Sign-in with JWT and two roles.** `POST /api/v1/auth/login` returns a token (HMAC-SHA256, 60 minutes). `LIBRARIAN` can do everything; `MEMBER` reads the catalog and only their own data through `GET /api/v1/me`, `/me/prestamos` and `/me/multas`, taking the member from the token and never from the request.
+- **Accounts** in a new `usuario` table (migration `V2`), with salted BCrypt hashes and database rules (a member account needs a member, one account per member, unique emails). The first librarian is created from `BIBLIOTECA_ADMIN_EMAIL` and `BIBLIOTECA_ADMIN_PASSWORD` when there are none; the demo profile creates three accounts from `BIBLIOTECA_DEMO_PASSWORD`.
+- **One list of who may call what** (`ReglasDeAcceso`), read by the filter chain and by the OpenAPI description. Anything not named under `/api` is for librarians only.
+- **Guessing is slowed down:** the same answer and about the same time for a wrong email and a wrong password, and a lock of five minutes after five failures in a row.
+- **Error codes** `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `FORBIDDEN` and `TOO_MANY_ATTEMPTS`, in the usual `{code, message}` shape also for the failures of the security filters; a refused token never says why.
+- **The signing key** (`JWT_SECRET`) has no default: the application does not start without at least 32 bytes.
+- CORS allows the `Authorization` header; the OpenAPI document declares the `bearerAuth` scheme and the roles of every operation (30 operations).
+
+### Changed
+
+- Deleting a member also deletes their account.
+
+### Tests
+
+- 398 tests. The new ones cover sign-in and the lock, forged, expired, unsigned and edited tokens, the roles through the real filters, a member never seeing another member's data, the schema rules of the accounts and the startup checks. The conformance test now signs in for real and walks every operation of the contract with no token, a librarian's and a member's.
+
 ## [0.2.0] - 2026-10-21
 
 The API gets its OpenAPI description, a demo library and a place in the whole system.

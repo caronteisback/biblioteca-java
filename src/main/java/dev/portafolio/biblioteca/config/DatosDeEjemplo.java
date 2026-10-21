@@ -7,11 +7,15 @@ import dev.portafolio.biblioteca.dto.PrestamoRequest;
 import dev.portafolio.biblioteca.dto.SocioRequest;
 import dev.portafolio.biblioteca.dto.SocioResponse;
 import dev.portafolio.biblioteca.repository.LibroRepository;
+import dev.portafolio.biblioteca.repository.SocioRepository;
+import dev.portafolio.biblioteca.repository.UsuarioRepository;
+import dev.portafolio.biblioteca.security.SeguridadProperties;
 import dev.portafolio.biblioteca.service.EjemplarService;
 import dev.portafolio.biblioteca.service.LibroService;
 import dev.portafolio.biblioteca.service.MultaService;
 import dev.portafolio.biblioteca.service.PrestamoService;
 import dev.portafolio.biblioteca.service.SocioService;
+import dev.portafolio.biblioteca.service.UsuarioService;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +31,9 @@ import org.springframework.stereotype.Component;
  * exception is time: a loan is always made today, so "weeks ago" is made by moving its dates back in the
  * database, which keeps "overdue" overdue whichever day the demo is started. It loads only into an empty
  * catalog and is started only by the {@code demo} profile (see {@link CargadorDeDemo}). All the data is made up.
+ *
+ * <p>It also creates three accounts to sign in with: a librarian and the members Rosa and Mateo (the ones with an
+ * overdue loan and a pending fine). Their password is the one of {@code BIBLIOTECA_DEMO_PASSWORD}; it is not in the code.
  */
 @Slf4j
 @Component
@@ -74,11 +81,43 @@ public class DatosDeEjemplo {
 	private final PrestamoService prestamoService;
 	private final MultaService multaService;
 	private final JdbcTemplate jdbc;
+	private final SocioRepository socioRepository;
+	private final UsuarioRepository usuarios;
+	private final UsuarioService usuarioService;
+	private final SeguridadProperties seguridad;
 
-	/** Loads the demo when the catalog is empty and does nothing otherwise. Returns whether it loaded. */
+	/**
+	 * Loads the demo catalog when it is empty and the accounts when there are none. Returns whether the catalog was
+	 * loaded; the accounts are created on their own so a demo database from before the sign-in gets them too.
+	 */
 	public boolean cargar() {
+		boolean catalogo = cargarCatalogo();
+		cargarCuentas();
+		return catalogo;
+	}
+
+	private void cargarCuentas() {
+		if (usuarios.count() > 0) {
+			return;
+		}
+		String password = seguridad.demoPassword();
+		if (password == null || password.isBlank()) {
+			throw new IllegalStateException("The demo profile creates accounts and needs BIBLIOTECA_DEMO_PASSWORD "
+					+ "(at least " + UsuarioService.LONGITUD_MINIMA_PASSWORD + " characters).");
+		}
+		usuarioService.crearBibliotecario("bibliotecaria@example.org", password);
+		for (String[] socio : SOCIOS) {
+			if (socio[0].equals("Rosa Valdivia") || socio[0].equals("Mateo Quispe")) {
+				socioRepository.findByEmailIgnoreCase(socio[1])
+						.ifPresent(encontrado -> usuarioService.crearSocio(socio[1], password, encontrado.getId()));
+			}
+		}
+		log.info("Demo accounts created: bibliotecaria@example.org, rosa.valdivia@example.org, mateo.quispe@example.org.");
+	}
+
+	private boolean cargarCatalogo() {
 		if (libros.count() > 0) {
-			log.info("The catalog already has books: the demo data is not loaded.");
+			log.info("The catalog already has books: the demo catalog is not loaded.");
 			return false;
 		}
 

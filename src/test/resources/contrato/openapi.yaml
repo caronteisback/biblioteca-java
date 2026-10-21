@@ -6,6 +6,8 @@ info:
 
     **Errors.** Every failure answers `{ "code": "...", "message": "..." }`. The `code` is stable and meant for programs; the `message` is English text for people. Each operation lists the codes it can return.
 
+    **Authentication.** Every operation but `login` needs a bearer token: `Authorization: Bearer <token>`. Get one with `POST /api/v1/auth/login`; it is valid for 60 minutes. There are two roles. A `LIBRARIAN` can do everything. A `MEMBER` can read the catalog and only their own data (`/api/v1/me`). Each operation lists the roles that may call it. Without a token the answer is `401 UNAUTHENTICATED`; with the wrong role, `403 FORBIDDEN`.
+
     **Dates** are days (`yyyy-MM-dd`) in the `America/Lima` zone and always come from the server, never from the client.
 
     **Calculated, never stored:** the member score and alerts, the loan alerts and the copy availability.
@@ -13,26 +15,97 @@ info:
     name: MIT
     url: https://opensource.org/license/mit
   title: Biblioteca API
-  version: 0.1.1
+  version: 0.2.1
 servers:
 - description: Local development
   url: http://localhost:8080
-security: []
+security:
+- bearerAuth: []
 tags:
-- description: "Titles of the catalog, identified by ISBN."
+- description: Signing in.
+  name: Authentication
+- description: What the signed-in user can see about themselves.
+  name: Account
+- description: Titles of the catalog, identified by ISBN.
   name: Books
 - description: Physical copies of a book. Loans are made on copies.
   name: Copies
-- description: "People who can borrow, with their score and alerts."
+- description: People who can borrow, with their score and alerts.
   name: Members
-- description: "Lending, renewing and returning a copy."
+- description: Lending, renewing and returning a copy.
   name: Loans
 - description: Fines created by late returns.
   name: Fines
 paths:
+  /api/v1/auth/login:
+    post:
+      description: "Exchanges an email and a password for a bearer token valid for 60 minutes. After 5 failed attempts in a row for the same email, further attempts are refused for 5 minutes (`TOO_MANY_ATTEMPTS`). The answer never says whether the email exists: a wrong email and a wrong password look the same (`INVALID_CREDENTIALS`)."
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                INVALID_CREDENTIALS:
+                  $ref: "#/components/examples/INVALID_CREDENTIALS"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INVALID_CREDENTIALS`."
+        "415":
+          content:
+            application/json:
+              examples:
+                UNSUPPORTED_MEDIA_TYPE:
+                  $ref: "#/components/examples/UNSUPPORTED_MEDIA_TYPE"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNSUPPORTED_MEDIA_TYPE`."
+        "429":
+          content:
+            application/json:
+              examples:
+                TOO_MANY_ATTEMPTS:
+                  $ref: "#/components/examples/TOO_MANY_ATTEMPTS"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `TOO_MANY_ATTEMPTS`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      security: []
+      summary: Sign in
+      tags:
+      - Authentication
   /api/v1/ejemplares/{id}:
     delete:
-      description: "A copy that appears in any loan is never deleted, only retired."
+      description: A copy that appears in any loan is never deleted, only retired.
       operationId: deleteCopy
       parameters:
       - in: path
@@ -53,6 +126,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -85,9 +176,11 @@ paths:
       summary: Delete a copy
       tags:
       - Copies
+      security:
+      - bearerAuth:
+        - LIBRARIAN
     get:
-      description: "`disponible` is calculated: the copy is active and has no active\
-        \ loan."
+      description: "`disponible` is calculated: the copy is active and has no active loan."
       operationId: getCopy
       parameters:
       - in: path
@@ -112,6 +205,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -133,6 +244,9 @@ paths:
       summary: Get a copy
       tags:
       - Copies
+      security:
+      - bearerAuth:
+        - LIBRARIAN
   /api/v1/ejemplares/{id}/alta:
     post:
       operationId: restoreCopy
@@ -159,6 +273,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -189,10 +321,12 @@ paths:
       summary: Bring a retired copy back
       tags:
       - Copies
+      security:
+      - bearerAuth:
+        - LIBRARIAN
   /api/v1/ejemplares/{id}/baja:
     post:
-      description: For a damaged or lost copy. A copy that is on loan cannot be retired.
-        Retiring twice is harmless.
+      description: For a damaged or lost copy. A copy that is on loan cannot be retired. Retiring twice is harmless.
       operationId: retireCopy
       parameters:
       - in: path
@@ -217,6 +351,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -249,19 +401,21 @@ paths:
       summary: Retire a copy
       tags:
       - Copies
+      security:
+      - bearerAuth:
+        - LIBRARIAN
   /api/v1/libros:
     get:
       description: Paginated and always ordered by id. A sort parameter is ignored.
       operationId: listBooks
       parameters:
-      - description: "Text that the title or the author must contain, ignoring case.\
-          \ `%` and `_` are literal."
+      - description: Text that the title or the author must contain, ignoring case. `%` and `_` are literal.
         in: query
         name: q
         required: false
         schema:
           type: string
-      - description: "Page number, starting at 0."
+      - description: Page number, starting at 0.
         in: query
         name: page
         required: false
@@ -270,7 +424,7 @@ paths:
           format: int32
           default: 0
           minimum: 0
-      - description: "Page size, from 1 to 100."
+      - description: Page size, from 1 to 100.
         in: query
         name: size
         required: false
@@ -296,6 +450,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
         "500":
           content:
             application/json:
@@ -308,9 +471,13 @@ paths:
       summary: List books
       tags:
       - Books
+      security:
+      - bearerAuth:
+        - LIBRARIAN
+      - bearerAuth:
+        - MEMBER
     post:
-      description: The ISBN may be written with hyphens or spaces; it is stored as
-        10 or 13 characters (a 10-digit ISBN may end in X).
+      description: The ISBN may be written with hyphens or spaces; it is stored as 10 or 13 characters (a 10-digit ISBN may end in X).
       operationId: createBook
       requestBody:
         content:
@@ -339,6 +506,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "409":
           content:
             application/json:
@@ -369,6 +554,9 @@ paths:
       summary: Create a book
       tags:
       - Books
+      security:
+      - bearerAuth:
+        - LIBRARIAN
   /api/v1/libros/{id}:
     delete:
       description: Only a book without copies can be deleted.
@@ -392,6 +580,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -422,6 +628,9 @@ paths:
       summary: Delete a book
       tags:
       - Books
+      security:
+      - bearerAuth:
+        - LIBRARIAN
     get:
       operationId: getBook
       parameters:
@@ -447,6 +656,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
         "404":
           content:
             application/json:
@@ -468,6 +686,11 @@ paths:
       summary: Get a book
       tags:
       - Books
+      security:
+      - bearerAuth:
+        - LIBRARIAN
+      - bearerAuth:
+        - MEMBER
     put:
       operationId: updateBook
       parameters:
@@ -499,6 +722,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -538,6 +779,9 @@ paths:
       summary: Replace the data of a book
       tags:
       - Books
+      security:
+      - bearerAuth:
+        - LIBRARIAN
   /api/v1/libros/{libroId}/ejemplares:
     get:
       description: Paginated and always ordered by id.
@@ -549,7 +793,7 @@ paths:
         schema:
           type: integer
           format: int64
-      - description: "Page number, starting at 0."
+      - description: Page number, starting at 0.
         in: query
         name: page
         required: false
@@ -558,7 +802,7 @@ paths:
           format: int32
           default: 0
           minimum: 0
-      - description: "Page size, from 1 to 100."
+      - description: Page size, from 1 to 100.
         in: query
         name: size
         required: false
@@ -584,6 +828,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
         "404":
           content:
             application/json:
@@ -605,6 +858,11 @@ paths:
       summary: List the copies of a book
       tags:
       - Copies
+      security:
+      - bearerAuth:
+        - LIBRARIAN
+      - bearerAuth:
+        - MEMBER
     post:
       operationId: createCopy
       parameters:
@@ -641,6 +899,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -680,18 +956,51 @@ paths:
       summary: Add a copy to a book
       tags:
       - Copies
-  /api/v1/multas:
+      security:
+      - bearerAuth:
+        - LIBRARIAN
+  /api/v1/me:
     get:
-      description: Paginated and always ordered by id.
-      operationId: listFines
+      description: The signed-in user. For a member it carries the member data, with the score and the alerts calculated now.
+      operationId: getMe
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsuarioResponse"
+          description: OK
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      security:
+      - bearerAuth:
+        - LIBRARIAN
+      - bearerAuth:
+        - MEMBER
+      summary: Get the signed-in user
+      tags:
+      - Account
+  /api/v1/me/multas:
+    get:
+      description: Only the fines of the signed-in member, paginated and ordered by id. A librarian has no fines of their own.
+      operationId: listMyFines
       parameters:
-      - description: Only the fines of the loans of this member.
-        in: query
-        name: socioId
-        required: false
-        schema:
-          type: integer
-          format: int64
       - description: Only the fines in this status.
         in: query
         name: estado
@@ -701,7 +1010,7 @@ paths:
           enum:
           - PENDING
           - PAID
-      - description: "Page number, starting at 0."
+      - description: Page number, starting at 0.
         in: query
         name: page
         required: false
@@ -710,7 +1019,7 @@ paths:
           format: int32
           default: 0
           minimum: 0
-      - description: "Page size, from 1 to 100."
+      - description: Page size, from 1 to 100.
         in: query
         name: size
         required: false
@@ -736,6 +1045,192 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      security:
+      - bearerAuth:
+        - MEMBER
+      summary: List my fines
+      tags:
+      - Account
+  /api/v1/me/prestamos:
+    get:
+      description: Only the loans of the signed-in member, paginated and ordered by id. A librarian has no loans of their own.
+      operationId: listMyLoans
+      parameters:
+      - description: "`true` lists the loans not yet returned, `false` the returned ones; leave it out for all."
+        in: query
+        name: activo
+        required: false
+        schema:
+          type: boolean
+      - description: Page number, starting at 0.
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - description: Page size, from 1 to 100.
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginaDtoPrestamoResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      security:
+      - bearerAuth:
+        - MEMBER
+      summary: List my loans
+      tags:
+      - Account
+  /api/v1/multas:
+    get:
+      description: Paginated and always ordered by id.
+      operationId: listFines
+      parameters:
+      - description: Only the fines of the loans of this member.
+        in: query
+        name: socioId
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - description: Only the fines in this status.
+        in: query
+        name: estado
+        required: false
+        schema:
+          type: string
+          enum:
+          - PENDING
+          - PAID
+      - description: Page number, starting at 0.
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - description: Page size, from 1 to 100.
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginaDtoMultaResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "500":
           content:
             application/json:
@@ -748,6 +1243,9 @@ paths:
       summary: List fines
       tags:
       - Fines
+      security:
+      - bearerAuth:
+        - LIBRARIAN
   /api/v1/multas/{id}:
     get:
       operationId: getFine
@@ -774,6 +1272,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -795,10 +1311,12 @@ paths:
       summary: Get a fine
       tags:
       - Fines
+      security:
+      - bearerAuth:
+        - LIBRARIAN
   /api/v1/multas/{id}/pago:
     post:
-      description: "Pays the whole amount: there is no payment gateway and no partial\
-        \ payment. Paying unblocks new loans but does not give score points back."
+      description: "Pays the whole amount: there is no payment gateway and no partial payment. Paying unblocks new loans but does not give score points back."
       operationId: payFine
       parameters:
       - in: path
@@ -823,6 +1341,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -855,6 +1391,9 @@ paths:
       summary: Pay a fine
       tags:
       - Fines
+      security:
+      - bearerAuth:
+        - LIBRARIAN
   /api/v1/prestamos:
     get:
       description: Paginated and always ordered by id.
@@ -867,14 +1406,13 @@ paths:
         schema:
           type: integer
           format: int64
-      - description: "`true` lists the loans not yet returned, `false` the returned\
-          \ ones; leave it out for all."
+      - description: "`true` lists the loans not yet returned, `false` the returned ones; leave it out for all."
         in: query
         name: activo
         required: false
         schema:
           type: boolean
-      - description: "Page number, starting at 0."
+      - description: Page number, starting at 0.
         in: query
         name: page
         required: false
@@ -883,7 +1421,7 @@ paths:
           format: int32
           default: 0
           minimum: 0
-      - description: "Page size, from 1 to 100."
+      - description: Page size, from 1 to 100.
         in: query
         name: size
         required: false
@@ -909,6 +1447,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "500":
           content:
             application/json:
@@ -921,12 +1477,11 @@ paths:
       summary: List loans
       tags:
       - Loans
+      security:
+      - bearerAuth:
+        - LIBRARIAN
     post:
-      description: "Eight checks run in a fixed order and the first that fails decides\
-        \ the error: member and copy exist, member active, copy active, copy not on\
-        \ loan, no overdue loan, no pending fine, score at least the minimum, fewer\
-        \ than the maximum active loans. Nothing is written if one fails. The loan\
-        \ date is today and the due date is 14 days later, both set by the server."
+      description: "Eight checks run in a fixed order and the first that fails decides the error: member and copy exist, member active, copy active, copy not on loan, no overdue loan, no pending fine, score at least the minimum, fewer than the maximum active loans. Nothing is written if one fails. The loan date is today and the due date is 14 days later, both set by the server."
       operationId: createLoan
       requestBody:
         content:
@@ -955,6 +1510,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -1004,9 +1577,7 @@ paths:
                   $ref: "#/components/examples/MEMBER_INACTIVE"
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-          description: "Error. Possible codes: `MEMBER_INACTIVE`, `COPY_INACTIVE`,\
-            \ `MEMBER_HAS_OVERDUE_LOAN`, `MEMBER_HAS_PENDING_FINE`, `MEMBER_BLOCKED_BY_SCORE`,\
-            \ `LOAN_LIMIT_REACHED`."
+          description: "Error. Possible codes: `MEMBER_INACTIVE`, `COPY_INACTIVE`, `MEMBER_HAS_OVERDUE_LOAN`, `MEMBER_HAS_PENDING_FINE`, `MEMBER_BLOCKED_BY_SCORE`, `LOAN_LIMIT_REACHED`."
         "500":
           content:
             application/json:
@@ -1019,10 +1590,12 @@ paths:
       summary: Lend a copy to a member
       tags:
       - Loans
+      security:
+      - bearerAuth:
+        - LIBRARIAN
   /api/v1/prestamos/{id}:
     get:
-      description: "Includes the days of delay as of today, the alerts, and the fine\
-        \ when the loan was returned late."
+      description: Includes the days of delay as of today, the alerts, and the fine when the loan was returned late.
       operationId: getLoan
       parameters:
       - in: path
@@ -1047,6 +1620,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -1068,11 +1659,12 @@ paths:
       summary: Get a loan
       tags:
       - Loans
+      security:
+      - bearerAuth:
+        - LIBRARIAN
   /api/v1/prestamos/{id}/devolucion:
     post:
-      description: "Always accepted for an active loan, even if the member or the\
-        \ copy were deactivated meanwhile. A return after the due date creates a fine\
-        \ of one sol per day late; returning on the due date is on time."
+      description: Always accepted for an active loan, even if the member or the copy were deactivated meanwhile. A return after the due date creates a fine of one sol per day late; returning on the due date is on time.
       operationId: returnLoan
       parameters:
       - in: path
@@ -1097,6 +1689,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -1129,11 +1739,12 @@ paths:
       summary: Return a loan
       tags:
       - Loans
+      security:
+      - bearerAuth:
+        - LIBRARIAN
   /api/v1/prestamos/{id}/renovacion:
     post:
-      description: "Adds one term to the current due date (not to today), up to the\
-        \ maximum number of renewals. It never creates a new loan. A fine or a low\
-        \ score do not block a renewal."
+      description: Adds one term to the current due date (not to today), up to the maximum number of renewals. It never creates a new loan. A fine or a low score do not block a renewal.
       operationId: renewLoan
       parameters:
       - in: path
@@ -1158,6 +1769,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -1190,8 +1819,7 @@ paths:
                   $ref: "#/components/examples/RENEWAL_NOT_ALLOWED_OVERDUE"
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-          description: "Error. Possible codes: `MEMBER_INACTIVE`, `RENEWAL_NOT_ALLOWED_OVERDUE`,\
-            \ `RENEWAL_LIMIT_REACHED`."
+          description: "Error. Possible codes: `MEMBER_INACTIVE`, `RENEWAL_NOT_ALLOWED_OVERDUE`, `RENEWAL_LIMIT_REACHED`."
         "500":
           content:
             application/json:
@@ -1204,20 +1832,21 @@ paths:
       summary: Renew a loan
       tags:
       - Loans
+      security:
+      - bearerAuth:
+        - LIBRARIAN
   /api/v1/socios:
     get:
-      description: "Paginated and always ordered by id. A row carries no score: calculating\
-        \ it needs the whole loan history, so ask for one member to get it."
+      description: "Paginated and always ordered by id. A row carries no score: calculating it needs the whole loan history, so ask for one member to get it."
       operationId: listMembers
       parameters:
-      - description: "Text that the name or the email must contain, ignoring case.\
-          \ `%` and `_` are literal."
+      - description: Text that the name or the email must contain, ignoring case. `%` and `_` are literal.
         in: query
         name: q
         required: false
         schema:
           type: string
-      - description: "Page number, starting at 0."
+      - description: Page number, starting at 0.
         in: query
         name: page
         required: false
@@ -1226,7 +1855,7 @@ paths:
           format: int32
           default: 0
           minimum: 0
-      - description: "Page size, from 1 to 100."
+      - description: Page size, from 1 to 100.
         in: query
         name: size
         required: false
@@ -1252,6 +1881,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "500":
           content:
             application/json:
@@ -1264,9 +1911,11 @@ paths:
       summary: List members
       tags:
       - Members
+      security:
+      - bearerAuth:
+        - LIBRARIAN
     post:
-      description: "The registration date is today, set by the server. The answer\
-        \ carries score 100 and no alerts."
+      description: The registration date is today, set by the server. The answer carries score 100 and no alerts.
       operationId: createMember
       requestBody:
         content:
@@ -1295,6 +1944,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "409":
           content:
             application/json:
@@ -1325,9 +1992,12 @@ paths:
       summary: Register a member
       tags:
       - Members
+      security:
+      - bearerAuth:
+        - LIBRARIAN
   /api/v1/socios/{id}:
     delete:
-      description: "A member that appears in any loan is never deleted, only deactivated."
+      description: A member that appears in any loan is never deleted, only deactivated.
       operationId: deleteMember
       parameters:
       - in: path
@@ -1348,6 +2018,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -1380,9 +2068,11 @@ paths:
       summary: Delete a member
       tags:
       - Members
+      security:
+      - bearerAuth:
+        - LIBRARIAN
     get:
-      description: The score and the alerts are calculated now from the loan history
-        and are never stored.
+      description: The score and the alerts are calculated now from the loan history and are never stored.
       operationId: getMember
       parameters:
       - in: path
@@ -1407,6 +2097,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -1428,6 +2136,9 @@ paths:
       summary: Get a member with score and alerts
       tags:
       - Members
+      security:
+      - bearerAuth:
+        - LIBRARIAN
     put:
       operationId: updateMember
       parameters:
@@ -1459,6 +2170,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -1498,10 +2227,12 @@ paths:
       summary: Replace the name and the email of a member
       tags:
       - Members
+      security:
+      - bearerAuth:
+        - LIBRARIAN
   /api/v1/socios/{id}/desactivar:
     post:
-      description: "A member with active loans cannot be deactivated. An inactive\
-        \ member cannot borrow or renew, but can still return."
+      description: A member with active loans cannot be deactivated. An inactive member cannot borrow or renew, but can still return.
       operationId: deactivateMember
       parameters:
       - in: path
@@ -1526,6 +2257,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -1558,6 +2307,9 @@ paths:
       summary: Deactivate a member
       tags:
       - Members
+      security:
+      - bearerAuth:
+        - LIBRARIAN
   /api/v1/socios/{id}/reactivar:
     post:
       operationId: reactivateMember
@@ -1584,6 +2336,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
         "404":
           content:
             application/json:
@@ -1614,6 +2384,9 @@ paths:
       summary: Reactivate a member
       tags:
       - Members
+      security:
+      - bearerAuth:
+        - LIBRARIAN
 components:
   examples:
     BOOK_HAS_COPIES:
@@ -1681,11 +2454,21 @@ components:
       value:
         code: FINE_NOT_FOUND
         message: The fine does not exist.
+    FORBIDDEN:
+      summary: FORBIDDEN
+      value:
+        code: FORBIDDEN
+        message: Your role is not allowed to use this operation.
     INTERNAL_ERROR:
       summary: INTERNAL_ERROR
       value:
         code: INTERNAL_ERROR
         message: An unexpected error occurred.
+    INVALID_CREDENTIALS:
+      summary: INVALID_CREDENTIALS
+      value:
+        code: INVALID_CREDENTIALS
+        message: The email or the password is not correct.
     LOAN_ALREADY_RETURNED:
       summary: LOAN_ALREADY_RETURNED
       value:
@@ -1746,6 +2529,16 @@ components:
       value:
         code: RENEWAL_NOT_ALLOWED_OVERDUE
         message: An overdue loan cannot be renewed. Return it first.
+    TOO_MANY_ATTEMPTS:
+      summary: TOO_MANY_ATTEMPTS
+      value:
+        code: TOO_MANY_ATTEMPTS
+        message: Too many failed attempts. Try again in a few minutes.
+    UNAUTHENTICATED:
+      summary: UNAUTHENTICATED
+      value:
+        code: UNAUTHENTICATED
+        message: You must sign in to use this operation.
     UNSUPPORTED_MEDIA_TYPE:
       summary: UNSUPPORTED_MEDIA_TYPE
       value:
@@ -1791,8 +2584,7 @@ components:
           type: string
         disponible:
           type: boolean
-          description: "Calculated: the copy is active and has no active loan. Never\
-            \ stored."
+          description: "Calculated: the copy is active and has no active loan. Never stored."
         id:
           type: integer
           format: int64
@@ -1810,8 +2602,7 @@ components:
       properties:
         code:
           type: string
-          description: "Stable error code. ENDPOINT_NOT_FOUND and METHOD_NOT_ALLOWED\
-            \ can answer any URL, so no operation lists them."
+          description: Stable error code. ENDPOINT_NOT_FOUND and METHOD_NOT_ALLOWED can answer any URL, so no operation lists them.
           enum:
           - VALIDATION_ERROR
           - BOOK_NOT_FOUND
@@ -1843,6 +2634,10 @@ components:
           - RENEWAL_LIMIT_REACHED
           - RENEWAL_NOT_ALLOWED_OVERDUE
           - INTERNAL_ERROR
+          - UNAUTHENTICATED
+          - FORBIDDEN
+          - INVALID_CREDENTIALS
+          - TOO_MANY_ATTEMPTS
         message:
           type: string
       required:
@@ -1880,7 +2675,7 @@ components:
           - integer
           - "null"
           format: int32
-          description: "Year of publication, when known."
+          description: Year of publication, when known.
         autor:
           type: string
         id:
@@ -1897,6 +2692,42 @@ components:
       - id
       - isbn
       - titulo
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 150
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+          writeOnly: true
+      required:
+      - email
+      - password
+    LoginResponse:
+      type: object
+      properties:
+        expiraEn:
+          type: string
+          format: date-time
+          description: The moment the token stops being valid.
+        tipo:
+          type: string
+          enum:
+          - Bearer
+        token:
+          type: string
+          description: "Send it as `Authorization: Bearer <token>`."
+        usuario:
+          $ref: "#/components/schemas/UsuarioResponse"
+      required:
+      - expiraEn
+      - tipo
+      - token
+      - usuario
     MultaResponse:
       type: object
       properties:
@@ -1926,7 +2757,7 @@ components:
         monto:
           type: number
           description: "Amount in soles: days late times the fine per day."
-          example: 5.0
+          example: 5
         prestamoId:
           type: integer
           format: int64
@@ -2090,8 +2921,7 @@ components:
         diasRetraso:
           type: integer
           format: int32
-          description: "Days late as of today for an active loan, or up to the return\
-            \ date for a returned one. Zero when on time."
+          description: Days late as of today for an active loan, or up to the return date for a returned one. Zero when on time.
           minimum: 0
         ejemplarId:
           type: integer
@@ -2105,7 +2935,7 @@ components:
         fechaPrestamo:
           type: string
           format: date
-          description: "Day the loan started, set by the server."
+          description: Day the loan started, set by the server.
         fechaVencimiento:
           type: string
           format: date
@@ -2114,8 +2944,7 @@ components:
           type: integer
           format: int64
         multa:
-          description: The fine created by a late return; null when the loan was on
-            time or is still active.
+          description: The fine created by a late return; null when the loan was on time or is still active.
           oneOf:
           - $ref: "#/components/schemas/MultaResponse"
           - type: "null"
@@ -2160,7 +2989,7 @@ components:
           type: boolean
         alertas:
           type: array
-          description: "PENDING_FINE and LOW_SCORE, calculated now."
+          description: PENDING_FINE and LOW_SCORE, calculated now.
           items:
             $ref: "#/components/schemas/Alerta"
         email:
@@ -2168,7 +2997,7 @@ components:
         fechaRegistro:
           type: string
           format: date
-          description: "Day of registration, set by the server."
+          description: Day of registration, set by the server.
         id:
           type: integer
           format: int64
@@ -2177,8 +3006,7 @@ components:
         score:
           type: integer
           format: int32
-          description: "Reliability score from 0 to 100, calculated from the loan\
-            \ history. It only goes down."
+          description: Reliability score from 0 to 100, calculated from the loan history. It only goes down.
           maximum: 100
           minimum: 0
       required:
@@ -2210,3 +3038,32 @@ components:
       - fechaRegistro
       - id
       - nombre
+    UsuarioResponse:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        id:
+          type: integer
+          format: int64
+        rol:
+          type: string
+          enum:
+          - LIBRARIAN
+          - MEMBER
+        socio:
+          oneOf:
+          - $ref: "#/components/schemas/SocioResponse"
+          - type: "null"
+          description: The member data, with score and alerts, when the role is MEMBER; null for a librarian.
+      required:
+      - email
+      - id
+      - rol
+  securitySchemes:
+    bearerAuth:
+      bearerFormat: JWT
+      description: "The token that `login` returns, sent as `Authorization: Bearer <token>`."
+      scheme: bearer
+      type: http

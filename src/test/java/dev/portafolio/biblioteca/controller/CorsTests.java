@@ -17,6 +17,7 @@ import dev.portafolio.biblioteca.service.LibroService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -28,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * What the browser asks before calling the API from another origin. The default origins are the
  * local development servers listed in application.yml.
  */
+@AutoConfigureMockMvc(addFilters = false)
 @WebMvcTest(LibroController.class)
 @Import({ BibliotecaConfig.class, CorsConfig.class })
 @ActiveProfiles("test")

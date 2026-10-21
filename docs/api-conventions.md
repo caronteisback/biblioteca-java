@@ -2,7 +2,7 @@
 
 Rules that every endpoint follows, so a client learns them once. Business behavior is in [business rules](business-rules.md); the full contract is the [OpenAPI document](openapi.yaml), generated from the code.
 
-Base path: `/api/v1`. Bodies are `application/json`. The API is open until the authentication phase.
+Base path: `/api/v1`. Bodies are `application/json`. Every operation but `POST /auth/login` needs `Authorization: Bearer <token>`; see "Authentication" below.
 
 ## Endpoints implemented
 
@@ -20,12 +20,25 @@ Optional filters: `GET /prestamos?socioId=&activo=` (`activo=true` lists loans n
 
 When two requests collide on the same member, copy, loan or fine, the second one waits up to 5 seconds. If the lock is still not free it answers `409 CONCURRENT_UPDATE` and the client may retry.
 
+## Authentication
+
+`POST /auth/login` with `{ "email", "password" }` answers `{ token, tipo: "Bearer", expiraEn, usuario }`. The token is a JWT valid for 60 minutes. Send it as `Authorization: Bearer <token>`.
+
+| Status | Code | When |
+|--------|------|------|
+| 401 | `UNAUTHENTICATED` | No token, a malformed one, a bad signature, an expired one, another issuer. The answer is the same for all, and carries `WWW-Authenticate: Bearer` |
+| 401 | `INVALID_CREDENTIALS` | Wrong email or wrong password (indistinguishable), or an account that is switched off |
+| 403 | `FORBIDDEN` | The token is valid but its role may not call that operation |
+| 429 | `TOO_MANY_ATTEMPTS` | Five failed sign-ins in a row for that email: locked for five minutes |
+
+Roles: `LIBRARIAN` may call everything; `MEMBER` may read the catalog (`GET /libros`, `GET /libros/{id}`, `GET /libros/{id}/ejemplares`) and its own data (`GET /me`, `GET /me/prestamos`, `GET /me/multas`). An unknown address answers `401` to someone who is not signed in, so it does not reveal which addresses exist. Each operation of the [OpenAPI document](openapi.yaml) lists the roles that may call it.
+
 ## Browser access (CORS)
 
 A web page served from another origin can call `/api/**` only if its origin is in `biblioteca.cors.origenes-permitidos`. The defaults are the local development servers (`http://localhost:5500`, `http://127.0.0.1:5500`, `http://localhost:3000`, `http://localhost:8000`, and the Vite server of the React frontend, `http://localhost:5173` and `http://127.0.0.1:5173`). To use another one, set `BIBLIOTECA_CORS_ORIGENES_PERMITIDOS` to a comma-separated list, for example `https://caronteisback.github.io`.
 
 - Origins are written as `scheme://host[:port]`, with no path, no trailing slash and **no wildcard**. A wildcard is rejected when the application starts.
-- Allowed methods: `GET`, `POST`, `PUT`, `DELETE`, `OPTIONS`. Allowed request header: `Content-Type`. The page can read the `Location` response header. The `Authorization` header is added with authentication in phase 6.
+- Allowed methods: `GET`, `POST`, `PUT`, `DELETE`, `OPTIONS`. Allowed request headers: `Content-Type` and `Authorization`. The page can read the `Location` response header. A preflight request is answered before any token is asked for.
 - A request from any other origin gets `403` from Spring before reaching a controller, so that one body is the framework's text and not `{code, message}`. The browser blocks the response anyway.
 - Other clients (`curl`, another backend) are not affected: CORS is a browser rule.
 

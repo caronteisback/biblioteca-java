@@ -3,6 +3,7 @@
 #   DB_URL            jdbc:oracle:thin:@//<host>:1521/<service>
 #   APP_USER          database user of the application (never SYS or SYSTEM)
 #   APP_USER_PASSWORD its password
+#   JWT_SECRET        key that signs the sign-in tokens (at least 32 bytes); without it the application does not start
 spring:
   datasource:
     url: ${DB_URL}
