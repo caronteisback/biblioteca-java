@@ -118,7 +118,7 @@ public class OpenApiConfig {
 			@SuppressWarnings("unchecked")
 			Schema<String> codigo = (Schema<String>) error.getProperties().get("code");
 			codigo.setEnum(Arrays.stream(ErrorCode.values()).map(Enum::name).collect(Collectors.toList()));
-			codigo.setDescription("Stable error code. See the catalog of the business rules.");
+			codigo.setDescription("Stable error code. ENDPOINT_NOT_FOUND and METHOD_NOT_ALLOWED can answer any URL, so no operation lists them.");
 
 			esquemas.forEach((nombre, esquema) -> {
 				if (!nombre.endsWith("Request") && esquema.getProperties() != null) {
@@ -137,16 +137,46 @@ public class OpenApiConfig {
 				}
 			});
 
-			// One shared example per error code, referenced by every operation that can return it.
+			// One shared example per error code, referenced by every operation that can return it. Two codes can
+			// answer any URL (unknown route, wrong method), so no operation lists them and they have no example.
+			Set<String> usados = ejemplosUsados(openApi);
 			Map<String, Example> ejemplos = componentes.getExamples() != null ? componentes.getExamples() : new LinkedHashMap<>();
 			componentes.setExamples(ejemplos);
 			for (ErrorCode entrada : ErrorCode.values()) {
+				if (!usados.contains(entrada.name())) {
+					continue;
+				}
 				Map<String, String> valor = new LinkedHashMap<>();
 				valor.put("code", entrada.name());
 				valor.put("message", entrada.message());
 				ejemplos.put(entrada.name(), new Example().summary(entrada.name()).value(valor));
 			}
+
+			// The API has no authentication yet. Saying so explicitly is different from saying nothing: it is
+			// part of the contract, and it will change when the JWT arrives.
+			openApi.setSecurity(new ArrayList<>());
 		};
+	}
+
+	/** Names of the shared examples that some operation points to. */
+	private static Set<String> ejemplosUsados(OpenAPI openApi) {
+		Set<String> usados = new LinkedHashSet<>();
+		String prefijo = "#/components/examples/";
+		openApi.getPaths().values().forEach(ruta -> ruta.readOperations().forEach(operacion ->
+				operacion.getResponses().values().forEach(respuesta -> {
+					if (respuesta.getContent() == null) {
+						return;
+					}
+					respuesta.getContent().values().forEach(medio -> {
+						if (medio.getExamples() != null) {
+							medio.getExamples().values().stream()
+									.map(Example::get$ref)
+									.filter(ref -> ref != null && ref.startsWith(prefijo))
+									.forEach(ref -> usados.add(ref.substring(prefijo.length())));
+						}
+					});
+				})));
+		return usados;
 	}
 
 	/**

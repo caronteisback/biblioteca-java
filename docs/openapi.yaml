@@ -17,6 +17,7 @@ info:
 servers:
 - description: Local development
   url: http://localhost:8080
+security: []
 tags:
 - description: "Titles of the catalog, identified by ISBN."
   name: Books
@@ -1670,11 +1671,6 @@ components:
       value:
         code: DUPLICATE_ISBN
         message: A book with that ISBN already exists.
-    ENDPOINT_NOT_FOUND:
-      summary: ENDPOINT_NOT_FOUND
-      value:
-        code: ENDPOINT_NOT_FOUND
-        message: The endpoint does not exist.
     FINE_ALREADY_PAID:
       summary: FINE_ALREADY_PAID
       value:
@@ -1740,11 +1736,6 @@ components:
       value:
         code: MEMBER_NOT_FOUND
         message: The member does not exist.
-    METHOD_NOT_ALLOWED:
-      summary: METHOD_NOT_ALLOWED
-      value:
-        code: METHOD_NOT_ALLOWED
-        message: The HTTP method is not allowed for this endpoint.
     RENEWAL_LIMIT_REACHED:
       summary: RENEWAL_LIMIT_REACHED
       value:
@@ -1819,7 +1810,8 @@ components:
       properties:
         code:
           type: string
-          description: Stable error code. See the catalog of the business rules.
+          description: "Stable error code. ENDPOINT_NOT_FOUND and METHOD_NOT_ALLOWED\
+            \ can answer any URL, so no operation lists them."
           enum:
           - VALIDATION_ERROR
           - BOOK_NOT_FOUND

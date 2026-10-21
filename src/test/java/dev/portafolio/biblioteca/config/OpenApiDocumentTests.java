@@ -125,8 +125,10 @@ class OpenApiDocumentTests extends BaseIntegracionTest {
 	void errorExamplesAreSharedComponentsNotCopiesInEveryOperation() throws Exception {
 		OpenAPI api = documento();
 
+		// Every code except the two that can answer any URL has an example, and no example goes unused.
 		assertThat(api.getComponents().getExamples().keySet())
-				.containsExactlyInAnyOrderElementsOf(Arrays.stream(ErrorCode.values()).map(Enum::name).toList());
+				.containsExactlyInAnyOrderElementsOf(Arrays.stream(ErrorCode.values()).map(Enum::name)
+						.filter(codigo -> !codigo.equals("ENDPOINT_NOT_FOUND") && !codigo.equals("METHOD_NOT_ALLOWED")).toList());
 		assertThat(generado()).doesNotContain("message: The member does not exist.\n              schema");
 	}
 
