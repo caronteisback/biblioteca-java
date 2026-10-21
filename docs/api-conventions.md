@@ -20,6 +20,15 @@ Optional filters: `GET /prestamos?socioId=&activo=` (`activo=true` lists loans n
 
 When two requests collide on the same member, copy, loan or fine, the second one waits up to 5 seconds. If the lock is still not free it answers `409 CONCURRENT_UPDATE` and the client may retry.
 
+## Browser access (CORS)
+
+A web page served from another origin can call `/api/**` only if its origin is in `biblioteca.cors.origenes-permitidos`. The defaults are the local development servers (`http://localhost:5500`, `http://127.0.0.1:5500`, `http://localhost:3000`, `http://localhost:8000`). To use another one, set `BIBLIOTECA_CORS_ORIGENES_PERMITIDOS` to a comma-separated list, for example `https://caronteisback.github.io`.
+
+- Origins are written as `scheme://host[:port]`, with no path, no trailing slash and **no wildcard**. A wildcard is rejected when the application starts.
+- Allowed methods: `GET`, `POST`, `PUT`, `DELETE`, `OPTIONS`. Allowed request header: `Content-Type`. The page can read the `Location` response header. The `Authorization` header is added with authentication in phase 6.
+- A request from any other origin gets `403` from Spring before reaching a controller, so that one body is the framework's text and not `{code, message}`. The browser blocks the response anyway.
+- Other clients (`curl`, another backend) are not affected: CORS is a browser rule.
+
 ## Status codes
 
 | Operation | Success |

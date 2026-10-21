@@ -5,9 +5,11 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
 import java.time.ZoneId;
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -21,7 +23,17 @@ public record BibliotecaProperties(
 		@NotNull ZoneId zonaHoraria,
 		@Valid @NotNull Prestamo prestamo,
 		@Valid @NotNull Multa multa,
-		@Valid @NotNull Score score) {
+		@Valid @NotNull Score score,
+		@Valid @NotNull Cors cors) {
+
+	/**
+	 * Browsers only let a page call this API from an origin listed here.
+	 *
+	 * @param origenesPermitidos origins such as {@code http://localhost:5500}: scheme, host and optional
+	 *        port, with no path, no trailing slash and no wildcard. An empty list allows no browser at all.
+	 */
+	public record Cors(@NotNull List<@Pattern(regexp = "^https?://[^/*\\s]+$") String> origenesPermitidos) {
+	}
 
 	/**
 	 * @param diasPlazo days granted by a loan and by each renewal

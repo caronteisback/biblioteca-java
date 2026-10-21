@@ -26,7 +26,9 @@ class BibliotecaPropertiesTests {
 					"biblioteca.score.inicial=100",
 					"biblioteca.score.penalizacion-base=10",
 					"biblioteca.score.penalizacion-por-dia=1",
-					"biblioteca.score.umbral-bloqueo=50");
+					"biblioteca.score.umbral-bloqueo=50",
+					"biblioteca.cors.origenes-permitidos[0]=http://localhost:5500",
+					"biblioteca.cors.origenes-permitidos[1]=https://caronteisback.github.io");
 
 	@Test
 	void bindsTheValuesOfTheBusinessRules() {
@@ -43,7 +45,26 @@ class BibliotecaPropertiesTests {
 			assertThat(properties.score().penalizacionBase()).isEqualTo(10);
 			assertThat(properties.score().penalizacionPorDia()).isEqualTo(1);
 			assertThat(properties.score().umbralBloqueo()).isEqualTo(50);
+			assertThat(properties.cors().origenesPermitidos()).containsExactly("http://localhost:5500", "https://caronteisback.github.io");
 		});
+	}
+
+	@Test
+	void aWildcardOriginStopsTheStartup() {
+		runner.withPropertyValues("biblioteca.cors.origenes-permitidos[2]=*")
+				.run(context -> assertThat(context).hasFailed());
+		runner.withPropertyValues("biblioteca.cors.origenes-permitidos[2]=https://*.example.org")
+				.run(context -> assertThat(context).hasFailed());
+	}
+
+	@Test
+	void anOriginWithAPathOrATrailingSlashOrNoSchemeStopsTheStartup() {
+		runner.withPropertyValues("biblioteca.cors.origenes-permitidos[2]=http://localhost:5500/")
+				.run(context -> assertThat(context).hasFailed());
+		runner.withPropertyValues("biblioteca.cors.origenes-permitidos[2]=http://localhost:5500/app")
+				.run(context -> assertThat(context).hasFailed());
+		runner.withPropertyValues("biblioteca.cors.origenes-permitidos[2]=localhost:5500")
+				.run(context -> assertThat(context).hasFailed());
 	}
 
 	@Test
