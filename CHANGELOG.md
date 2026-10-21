@@ -6,6 +6,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ### Added
 
+- **Demo data:** the `demo` profile loads a small made-up library (20 books with copies, 8 members, loans in every state, a pending and a paid fine) through the real services, only into an empty catalog. Never loaded without the profile.
+
 - **OpenAPI 3.1 document** generated from the code: 26 operations with ids, summaries and descriptions, the error codes of each one (with shared examples), `201` with `Location` and `204` where they apply, and `required` on every field that is never null. The `ErrorResponse` schema lists every error code.
 - **Swagger UI** at `/swagger-ui.html` and the document at `/v3/api-docs`, in the `dev` profile only; with `prod` both answer `404`.
 - **`docs/openapi.yaml`**, a committed copy that a test compares with the generated document, so it cannot drift.
@@ -16,7 +18,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ### Tests
 
-- 307 tests: 24 new ones check that the document is valid, complete and hidden outside `dev`, and that the API follows the contract.
+- 312 tests: 24 new ones check that the document is valid, complete and hidden outside `dev`, and that the API follows the contract; 5 more check the demo data.
 
 ### Changed
 

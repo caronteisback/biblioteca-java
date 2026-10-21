@@ -27,7 +27,7 @@ The rules are written in [docs/business-rules.md](docs/business-rules.md) and ev
 - **Concurrency is designed and tested, not hoped for.** Row locks are taken in one fixed order (member, copy, loan) with a 5-second cap. Nine tests run real threads against Oracle, and removing the locks makes six of them fail, so they do detect the races. An experiment also showed that one lock I had planned was not needed, and the code and docs say so.
 - **Derived data is never stored.** Score, alerts and copy availability are calculated from the history, so they cannot disagree with it.
 - **One error shape.** Every failure answers `{ "code": "...", "message": "..." }` with a stable code and the right status (400, 404, 405, 409, 415, 422, 500), and nothing internal (SQL, constraint names, stack traces) reaches the client.
-- **Real database in tests.** 300 tests run on Oracle XE in Testcontainers, not on an in-memory substitute that hides engine behavior.
+- **Real database in tests.** 312 tests run on Oracle XE in Testcontainers, not on an in-memory substitute that hides engine behavior.
 - **Design first.** Business rules, process flows, sequence diagrams, class and ER diagrams, query plans checked with `DBMS_XPLAN`, and architecture decision records live in [`docs/`](docs/README.md).
 
 ## Quick start
@@ -145,6 +145,12 @@ docker run -d --name biblioteca-api --network biblioteca-java_default -p 8080:80
 
 The `--network` flag puts the container on the network of `docker compose up -d`, where the database is reachable as `oracle`. To let a browser page call the API from another origin, set `BIBLIOTECA_CORS_ORIGENES_PERMITIDOS` (comma-separated, no wildcard).
 
+### Demo data
+
+To look at the API with something in it, add the `demo` profile (`SPRING_PROFILES_ACTIVE=prod,demo` in the container, or `--spring.profiles.active=dev,demo` with Maven). On start it loads a small made-up library, only if the catalog is empty: 20 books with their copies, 8 members, and loans in every state (due soon, renewed, four days overdue, returned late with a pending fine, returned late and paid, a deactivated member, a retired copy). It goes through the real services, so the rules apply to it as to any request, and "overdue" stays overdue whichever day you start it. Without the profile nothing is loaded.
+
+The [biblioteca](https://github.com/caronteisback/biblioteca) repository starts the whole system, with this demo data, in one command.
+
 ## Architecture
 
 ```
@@ -164,7 +170,7 @@ controller  ->  service  ->  repository  ->  Oracle XE
 ./mvnw verify
 ```
 
-300 tests. They start a throwaway Oracle XE 21c container with Testcontainers (Docker must be running; the first run downloads the image), share one container for the whole run and never touch the compose database.
+312 tests. They start a throwaway Oracle XE 21c container with Testcontainers (Docker must be running; the first run downloads the image), share one container for the whole run and never touch the compose database.
 
 | Level | What it proves |
 |-------|----------------|
