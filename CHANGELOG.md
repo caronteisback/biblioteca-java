@@ -2,7 +2,9 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.2.0] - 2026-10-21
+
+The API gets its OpenAPI description, a demo library and a place in the whole system.
 
 ### Added
 
@@ -22,7 +24,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ### Changed
 
-- The project version is now `0.2.0-SNAPSHOT`. The API contract version (`0.1.0`) is kept apart from the artifact version.
+- The project version is now `0.2.0`. The API contract version (`0.1.1`) is kept apart from the artifact version.
 
 ## [0.1.0] - 2026-10-21
 
