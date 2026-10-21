@@ -1,62 +1,46 @@
 # biblioteca-java
 
-REST API for a library system (books, copies, members and loans), built with **Java 17**, **Spring Boot 4** and **Oracle Database XE 21c**.
+[![CI](https://github.com/caronteisback/biblioteca-java/actions/workflows/ci.yml/badge.svg)](https://github.com/caronteisback/biblioteca-java/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Java 17](https://img.shields.io/badge/Java-17-orange)
+![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1-brightgreen)
+![Oracle XE 21c](https://img.shields.io/badge/Oracle-XE%2021c-red)
+
+REST API for a small library: books, copies, members, loans, renewals, returns and fines. Built with **Java 17**, **Spring Boot 4**, Spring Data JPA and **Oracle Database XE 21c**, with the design documented before the code.
 
 > All data in this project is fictional. It is a portfolio project and is not related to any real organization.
 
-## Status
+## What it does
 
-| Part | Scope | State |
-|------|-------|-------|
-| A | Project skeleton, Oracle XE in Docker, Flyway, health endpoint, Testcontainers | Done |
-| B1 | Schema (`V1`), JPA entities and repositories, constraint and query tests | Done |
-| B2a | Business parameters, clock, error model (`{code, message}`), score, fine and alert calculation | Done |
-| B2b | Catalog and members: services and REST controllers | Done |
-| B2c | Loans, renewals, returns and fines, with concurrency tests | Done |
-| C2 | Configurable CORS for the browser frontend, Dockerfile and production profile | Done |
-| C3 | CI with GitHub Actions, final README review, license, release | Next |
-| C1 | OpenAPI document and Swagger UI (kept short, just before the shared contract) | Planned |
+- **Catalog:** books with a unique ISBN, physical copies that can be retired, members with a unique email.
+- **Loans:** a member can have up to **5 active loans** of 14 days each. Eight checks run in a fixed order and each failure has its own error code.
+- **Renewals:** up to 3 per loan, each one adding 14 days to the current due date. An overdue loan cannot be renewed.
+- **Returns and fines:** a late return creates a fine of S/ 1 per day, paid whole and only once. There is no payment gateway.
+- **Score:** a reliability score calculated from the loan history on every query. It starts at 100, only goes down, and below 50 the member cannot borrow. It is never stored.
+- **Alerts:** `DUE_SOON`, `OVERDUE`, `PENDING_FINE` and `LOW_SCORE`, calculated at query time.
 
-## Documentation
+The rules are written in [docs/business-rules.md](docs/business-rules.md) and every behavior is tested.
 
-The design comes first and lives in [`docs/`](docs/README.md):
+## What makes it interesting
 
-- [Business rules](docs/business-rules.md) and the error catalog
-- [Process flows](docs/diagrams/process-flows.md) and [sequence diagrams](docs/diagrams/sequence-diagrams.md)
-- [Class diagram](docs/diagrams/class-diagram.md) (JPA entities) and [ER diagram](docs/diagrams/er-diagram.md) (Oracle)
-- [Architecture decisions](docs/adr/)
+- **The database enforces the rules too.** One active loan per copy is a function-based unique index; renewals 0 to 3, coherent dates and fine consistency are `CHECK` constraints. If application code has a bug, the schema still refuses the bad row.
+- **Concurrency is designed and tested, not hoped for.** Row locks are taken in one fixed order (member, copy, loan) with a 5-second cap. Nine tests run real threads against Oracle, and removing the locks makes six of them fail, so they do detect the races. An experiment also showed that one lock I had planned was not needed, and the code and docs say so.
+- **Derived data is never stored.** Score, alerts and copy availability are calculated from the history, so they cannot disagree with it.
+- **One error shape.** Every failure answers `{ "code": "...", "message": "..." }` with a stable code and the right status (400, 404, 405, 409, 415, 422, 500), and nothing internal (SQL, constraint names, stack traces) reaches the client.
+- **Real database in tests.** 283 tests run on Oracle XE in Testcontainers, not on an in-memory substitute that hides engine behavior.
+- **Design first.** Business rules, process flows, sequence diagrams, class and ER diagrams, query plans checked with `DBMS_XPLAN`, and architecture decision records live in [`docs/`](docs/README.md).
 
-## Architecture
+## Quick start
 
-```
-controller  ->  service  ->  repository  ->  Oracle XE
-   (HTTP)     (business rules,   (Spring Data JPA)
-               transactions)
-```
+Requirements: JDK 17 or newer, Docker Desktop (Compose v2). No Maven installation is needed: the repository includes the wrapper.
 
-- **Packages by layer** under `dev.portafolio.biblioteca`: `config`, `controller`, `dto`, `entity`, `exception`, `repository`, `security` (empty until phase 6) and `service`. See [ADR 0002](docs/adr/0002-package-by-layer.md).
-- **Schema ownership:** Flyway migrations (`src/main/resources/db/migration`) are the only way the schema changes. Hibernate runs with `ddl-auto: validate`.
-- **Configuration:** one `.env` file feeds both `docker compose` and Spring Boot. No credentials live in code or in committed files.
-- **Profiles:** `dev` (default, uses the compose database) and `test` (Testcontainers starts a disposable Oracle XE).
-
-## Requirements
-
-- JDK 17 or newer (the code is compiled with `release 17`)
-- Docker Desktop (Compose v2)
-- No Maven installation needed: use the included wrapper (`mvnw` / `mvnw.cmd`)
-- IntelliJ IDEA: the project uses Lombok. Reload the Maven project and enable *Settings > Build, Execution, Deployment > Compiler > Annotation Processors > Enable annotation processing*. Maven builds need nothing extra
-
-## Run
-
-1. Create your local configuration and set your own passwords:
+1. Create your local configuration and set your own passwords (letters and digits only):
 
    ```bash
    cp .env.example .env
    ```
 
-   Edit `.env`. Use letters and digits only to keep the file valid for both Compose and Spring.
-
-2. Start the database and wait until it is healthy (first start takes about a minute):
+2. Start the database and wait until it is healthy (the first start takes about a minute):
 
    ```bash
    docker compose up -d
@@ -79,9 +63,13 @@ controller  ->  service  ->  repository  ->  Oracle XE
 
    Expected: `{"groups":["liveness","readiness"],"status":"UP"}`
 
+Stop the database with `docker compose down`. To wipe all data and re-run initialization, use `docker compose down -v`.
+
+IntelliJ IDEA: the project uses Lombok. Reload the Maven project and enable *Settings > Build, Execution, Deployment > Compiler > Annotation Processors > Enable annotation processing*. Maven builds need nothing extra.
+
 ## Try the API
 
-With the API running (all data is fictional):
+With the API running:
 
 ```bash
 # create a book (the ISBN may carry hyphens)
@@ -95,9 +83,6 @@ curl -X POST http://localhost:8080/api/v1/libros/1/ejemplares -H "Content-Type: 
 curl -X POST http://localhost:8080/api/v1/socios -H "Content-Type: application/json" \
   -d '{"nombre":"Rosa Ficticia","email":"rosa@example.org"}'
 
-# list books whose title or author contains "faro", 5 per page
-curl "http://localhost:8080/api/v1/libros?q=faro&size=5"
-
 # lend copy 1 to member 1 (the due date is 14 days from today, set by the server)
 curl -X POST http://localhost:8080/api/v1/prestamos -H "Content-Type: application/json" -d '{"socioId":1,"ejemplarId":1}'
 
@@ -105,13 +90,22 @@ curl -X POST http://localhost:8080/api/v1/prestamos -H "Content-Type: applicatio
 curl -X POST http://localhost:8080/api/v1/prestamos/1/renovacion
 curl -X POST http://localhost:8080/api/v1/prestamos/1/devolucion
 
-# the member now carries a score and alerts calculated from the history
+# the member carries a score and alerts calculated from the history
 curl http://localhost:8080/api/v1/socios/1
+
+# list books whose title or author contains "faro", 5 per page
+curl "http://localhost:8080/api/v1/libros?q=faro&size=5"
 ```
 
-Every failure answers `{"code": "...", "message": "..."}` with the right status; see [API conventions](docs/api-conventions.md) and the error catalog in [business rules](docs/business-rules.md).
+| Resource | Main endpoints under `/api/v1` |
+|----------|--------------------------------|
+| Books | `POST/GET /libros`, `GET/PUT/DELETE /libros/{id}` |
+| Copies | `POST/GET /libros/{id}/ejemplares`, `GET/DELETE /ejemplares/{id}`, `POST /ejemplares/{id}/baja` and `/alta` |
+| Members | `POST/GET /socios`, `GET/PUT/DELETE /socios/{id}`, `POST /socios/{id}/desactivar` and `/reactivar` |
+| Loans | `POST/GET /prestamos`, `GET /prestamos/{id}`, `POST /prestamos/{id}/renovacion` and `/devolucion` |
+| Fines | `GET /multas`, `GET /multas/{id}`, `POST /multas/{id}/pago` |
 
-Stop the database with `docker compose down`. To wipe all data and re-run initialization, use `docker compose down -v`.
+Statuses, pagination, filters and CORS are in [API conventions](docs/api-conventions.md); the error catalog is in [business rules](docs/business-rules.md#14-error-catalog).
 
 ## Run in a container
 
@@ -127,30 +121,39 @@ docker run -d --name biblioteca-api --network biblioteca-java_default -p 8080:80
   biblioteca-java
 ```
 
-The `--network` flag puts the container on the network of `docker compose up -d`, where the database is reachable as `oracle`. The complete compose file (database, both backends and the frontend) comes in phase 6.
+The `--network` flag puts the container on the network of `docker compose up -d`, where the database is reachable as `oracle`. To let a browser page call the API from another origin, set `BIBLIOTECA_CORS_ORIGENES_PERMITIDOS` (comma-separated, no wildcard).
 
-To let a browser page call the API from another origin, set `BIBLIOTECA_CORS_ORIGENES_PERMITIDOS` (comma-separated, no wildcard). See [API conventions](docs/api-conventions.md#browser-access-cors).
+## Architecture
+
+```
+controller  ->  service  ->  repository  ->  Oracle XE
+   (HTTP)     (rules, locks,   (Spring Data JPA)
+               transactions)
+```
+
+- **Packages by layer** under `dev.portafolio.biblioteca`: `config`, `controller`, `dto`, `entity`, `exception`, `repository`, `security` (empty until a later phase) and `service`. See [ADR 0002](docs/adr/0002-package-by-layer.md).
+- **Schema ownership:** Flyway migrations in `src/main/resources/db/migration` are the only way the schema changes. Hibernate runs with `ddl-auto: validate`.
+- **Configuration:** one `.env` file feeds both `docker compose` and Spring Boot; no credentials live in code or in committed files. Business parameters (term, limits, fine, score) are in `application.yml` and an invalid value stops the startup.
+- **Profiles:** `dev` (default, uses the compose database), `test` (Testcontainers) and `prod` (everything from the environment).
 
 ## Tests
 
 ```bash
-./mvnw test
+./mvnw verify
 ```
 
-Tests start a throwaway Oracle XE 21c container with Testcontainers (Docker must be running; the first run downloads the image). One container is shared by the whole run, and the tests do not touch the compose database.
+283 tests. They start a throwaway Oracle XE 21c container with Testcontainers (Docker must be running; the first run downloads the image), share one container for the whole run and never touch the compose database.
 
-- `PrestamoTests`: the date rules of a loan, without a database.
-- `EsquemaRestriccionesTests`: the rules the schema enforces on its own (one active loan per copy, renewals 0 to 3, unique email ignoring case, fine consistency). Each rejection is checked by the constraint name Oracle reports.
-- `RepositoriosConsultasTests`: the locking and counting queries the services will use.
-- `ScoreCalculatorTests`, `AlertaCalculatorTests`: the score formula and the alerts, including the worked example of the business rules.
-- `GlobalExceptionHandlerTests`: every failure comes out as `{code, message}` with the right status and without internals (SQL, constraint names, stack traces).
-- `ConstraintErrorsTests`, `BibliotecaPropertiesTests`: constraint-to-error translation and the validation of the business parameters at startup.
-- `LibroServiceTests`, `EjemplarServiceTests`, `SocioServiceTests`: the catalog and member rules against real Oracle, each error code checked.
-- `LibroControllerTests`, `EjemplarControllerTests`, `SocioControllerTests`: the HTTP contract (statuses, JSON, validation) with the service mocked.
-- `CatalogoApiTests`: the whole path, HTTP to Oracle, with the real error handler.
-- `PrestamoServiceTests`, `MultaServiceTests`: the loan rules at their exact boundaries (5th and 6th loan, score 50 and 49, due today and due yesterday), the order of the eight checks, renewals, fines.
-- `PrestamoControllerTests`, `MultaControllerTests`, `PrestamosApiTests`: the HTTP contract of loans and fines, and the whole life of a loan over HTTP.
-- `ConcurrenciaTests`: real threads against Oracle (no rollback): one copy and eight members, six loans for one member, double return, double renewal, double payment, retiring a copy while it is lent, and a lock held too long. Removing the row locks makes 6 of these 9 tests fail, so they do detect the races.
+| Level | What it proves |
+|-------|----------------|
+| Unit | Date rules of a loan, score, fine and alert formulas, constraint-to-error translation, validation of the business parameters |
+| Schema | Every rule the database enforces by itself; each rejection is checked by the constraint name Oracle reports |
+| Services (real Oracle) | Each rule at its exact boundary (5th and 6th loan, score 50 and 49, due today and due yesterday), the order of the eight checks, every error code |
+| Controllers (mocked services) | The HTTP contract: statuses, JSON, validation, CORS |
+| Whole path | HTTP to Oracle with the real error handler, including the full life of a loan |
+| Concurrency | Real threads on Oracle: one copy and eight members, six loans for one member, double return, double renewal, double payment, retiring a copy while it is lent, a lock held too long |
+
+Continuous integration runs the same command on every push, and also checks that the Docker image builds.
 
 ## Key decisions
 
@@ -161,21 +164,39 @@ Tests start a throwaway Oracle XE 21c container with Testcontainers (Docker must
 | Boilerplate | Lombok on entities (no `@Data`) | Hand-written getters and builders: more explicit, more code |
 | Database | Oracle XE 21c | PostgreSQL: lighter, but not the target engine; H2: hides Oracle-specific behavior |
 | Schema management | Flyway (plain SQL) | Hibernate `ddl-auto`: unsafe and unversioned |
-| Test database | Testcontainers with the same Oracle image | H2 in Oracle mode: not the real engine |
+| Concurrency | Pessimistic row locks in a fixed order, plus constraints as the last safety net | Optimistic versioning: more retries; counter column: a duplicated datum that can drift |
+| Score | Derived from history on every query | A stored column: counts no unreturned loans and can drift |
+| Packages | By layer | By feature: see [ADR 0002](docs/adr/0002-package-by-layer.md) |
 
 ## Security notes
 
-- The database port is published on `127.0.0.1` only.
-- The application connects with a dedicated schema user, never with `SYS`/`SYSTEM`.
+- No secret in the repository or in the image; `.env` is git-ignored and `.dockerignore` keeps it out of the build.
+- The database port is published on `127.0.0.1` only, and the application connects with a dedicated schema user, never with `SYS` or `SYSTEM`.
+- Every query uses bind variables; input is validated; errors never expose SQL, constraint names or stack traces.
+- CORS allows only the listed origins, never a wildcard (a wildcard stops the startup).
 - `/actuator/health` hides component details; only `health` and `info` are exposed.
-- Error responses do not include messages or stack traces from the framework.
+- The API is open for now. Authentication (JWT) and the roles `LIBRARIAN` and `MEMBER` arrive in a later phase, so do not expose it to a network.
+
+## Documentation
+
+Everything is in [`docs/`](docs/README.md): [business rules](docs/business-rules.md), [process flows](docs/diagrams/process-flows.md), [sequence diagrams](docs/diagrams/sequence-diagrams.md), [class diagram](docs/diagrams/class-diagram.md), [ER diagram](docs/diagrams/er-diagram.md), [query plans](docs/query-plans.md), [API conventions](docs/api-conventions.md) and [architecture decisions](docs/adr/). See also the [CHANGELOG](CHANGELOG.md).
+
+## Roadmap
+
+- **Next:** an OpenAPI document with Swagger UI, which becomes the shared contract for the other backend and the frontend.
+- **Later:** authentication with JWT and roles, a complete `docker compose` with every component, and a browser frontend.
 
 ## Troubleshooting
 
 - `ORA-12514` or `ORA-65096`: the JDBC URL must point to the service `XEPDB1`, not `XE`.
 - Init variables seem ignored: they apply only when the volume is empty. Run `docker compose down -v` and start again.
+- `Port 8080 was already in use`: another copy of the API is running (terminal, IDE or container).
 - `bad interpreter` in scripts on Windows: files need LF endings; `.gitattributes` enforces this.
 
 ## Conventions
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/). See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+[MIT](LICENSE)
