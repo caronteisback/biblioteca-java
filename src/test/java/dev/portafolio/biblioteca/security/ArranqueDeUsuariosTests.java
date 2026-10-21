@@ -11,6 +11,7 @@ import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.DefaultApplicationArguments;
+import org.springframework.core.annotation.OrderUtils;
 
 /** The first librarian is created from the environment, only into an empty table, and never with a weak password. */
 class ArranqueDeUsuariosTests extends BaseIntegracionTest {
@@ -28,6 +29,16 @@ class ArranqueDeUsuariosTests extends BaseIntegracionTest {
 
 	private void ejecutar(ArranqueDeUsuarios arranque) {
 		arranque.run(new DefaultApplicationArguments());
+	}
+
+	@Test
+	void theDemoStartsBeforeTheCheckForAccountsSoTheLogDoesNotSayNobodyCanSignIn() throws Exception {
+		Integer demo = OrderUtils.getOrder(Class.forName("dev.portafolio.biblioteca.config.CargadorDeDemo"));
+		Integer arranque = OrderUtils.getOrder(ArranqueDeUsuarios.class);
+
+		assertThat(demo).isNotNull();
+		assertThat(arranque).isNotNull();
+		assertThat(demo).isLessThan(arranque);
 	}
 
 	@Test

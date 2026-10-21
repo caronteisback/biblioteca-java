@@ -27,7 +27,7 @@ The rules are written in [docs/business-rules.md](docs/business-rules.md) and ev
 - **Concurrency is designed and tested, not hoped for.** Row locks are taken in one fixed order (member, copy, loan) with a 5-second cap. Nine tests run real threads against Oracle, and removing the locks makes six of them fail, so they do detect the races. An experiment also showed that one lock I had planned was not needed, and the code and docs say so.
 - **Derived data is never stored.** Score, alerts and copy availability are calculated from the history, so they cannot disagree with it.
 - **One error shape.** Every failure answers `{ "code": "...", "message": "..." }` with a stable code and the right status (400, 404, 405, 409, 415, 422, 500), and nothing internal (SQL, constraint names, stack traces) reaches the client.
-- **Real database in tests.** 398 tests run on Oracle XE in Testcontainers, not on an in-memory substitute that hides engine behavior.
+- **Real database in tests.** 399 tests run on Oracle XE in Testcontainers, not on an in-memory substitute that hides engine behavior.
 - **Design first.** Business rules, process flows, sequence diagrams, class and ER diagrams, query plans checked with `DBMS_XPLAN`, and architecture decision records live in [`docs/`](docs/README.md).
 
 ## Quick start
@@ -199,7 +199,7 @@ controller  ->  service  ->  repository  ->  Oracle XE
 ./mvnw verify
 ```
 
-398 tests. They start a throwaway Oracle XE 21c container with Testcontainers (Docker must be running; the first run downloads the image), share one container for the whole run and never touch the compose database.
+399 tests. They start a throwaway Oracle XE 21c container with Testcontainers (Docker must be running; the first run downloads the image), share one container for the whole run and never touch the compose database.
 
 | Level | What it proves |
 |-------|----------------|

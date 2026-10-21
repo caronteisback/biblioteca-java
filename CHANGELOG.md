@@ -2,6 +2,12 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.3.1] - 2026-10-21
+
+### Fixed
+
+- With the demo profile the log said "There are no accounts, so nobody can sign in" a moment before creating the demo accounts, because the two startup steps ran in no fixed order. The demo now runs first.
+
 ## [0.3.0] - 2026-10-21
 
 **Breaking:** every operation but `POST /api/v1/auth/login` now needs a bearer token (contract biblioteca-contrato v0.2.1).
@@ -22,7 +28,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ### Tests
 
-- 398 tests. The new ones cover sign-in and the lock, forged, expired, unsigned and edited tokens, the roles through the real filters, a member never seeing another member's data, the schema rules of the accounts and the startup checks. The conformance test now signs in for real and walks every operation of the contract with no token, a librarian's and a member's.
+- 399 tests. The new ones cover sign-in and the lock, forged, expired, unsigned and edited tokens, the roles through the real filters, a member never seeing another member's data, the schema rules of the accounts and the startup checks. The conformance test now signs in for real and walks every operation of the contract with no token, a librarian's and a member's.
 
 ## [0.2.0] - 2026-10-21
 
