@@ -7,18 +7,27 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 
-public interface PrestamoRepository extends JpaRepository<Prestamo, Long> {
+public interface PrestamoRepository extends JpaRepository<Prestamo, Long>, JpaSpecificationExecutor<Prestamo> {
 
 	/** Locks the loan row while it is renewed or returned, so a second request sees the new state. */
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "5000"))
 	@Query("select p from Prestamo p where p.id = :id")
 	Optional<Prestamo> findByIdForUpdate(@Param("id") Long id);
+
+	/**
+	 * Only the member id, without loading the loan. A return must lock the member before the loan;
+	 * loading the loan first would leave a copy in the persistence context that the later lock does
+	 * not refresh, and the return could act on stale data.
+	 */
+	@Query("select p.socio.id from Prestamo p where p.id = :id")
+	Optional<Long> findSocioIdById(@Param("id") Long id);
 
 	long countBySocioIdAndFechaDevolucionIsNull(Long socioId);
 
