@@ -56,7 +56,8 @@ class CorsTests {
 
 	@Test
 	void everyDefaultLocalOriginIsAllowed() throws Exception {
-		for (String origen : List.of("http://localhost:5500", "http://127.0.0.1:5500", "http://localhost:3000", "http://localhost:8000")) {
+		for (String origen : List.of("http://localhost:5500", "http://127.0.0.1:5500", "http://localhost:3000", "http://localhost:8000",
+				"http://localhost:5173", "http://127.0.0.1:5173")) {
 			mvc.perform(options("/api/v1/libros").header("Origin", origen).header("Access-Control-Request-Method", "GET"))
 					.andExpect(status().isOk())
 					.andExpect(header().string("Access-Control-Allow-Origin", origen));

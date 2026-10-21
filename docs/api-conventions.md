@@ -22,7 +22,7 @@ When two requests collide on the same member, copy, loan or fine, the second one
 
 ## Browser access (CORS)
 
-A web page served from another origin can call `/api/**` only if its origin is in `biblioteca.cors.origenes-permitidos`. The defaults are the local development servers (`http://localhost:5500`, `http://127.0.0.1:5500`, `http://localhost:3000`, `http://localhost:8000`). To use another one, set `BIBLIOTECA_CORS_ORIGENES_PERMITIDOS` to a comma-separated list, for example `https://caronteisback.github.io`.
+A web page served from another origin can call `/api/**` only if its origin is in `biblioteca.cors.origenes-permitidos`. The defaults are the local development servers (`http://localhost:5500`, `http://127.0.0.1:5500`, `http://localhost:3000`, `http://localhost:8000`, and the Vite server of the React frontend, `http://localhost:5173` and `http://127.0.0.1:5173`). To use another one, set `BIBLIOTECA_CORS_ORIGENES_PERMITIDOS` to a comma-separated list, for example `https://caronteisback.github.io`.
 
 - Origins are written as `scheme://host[:port]`, with no path, no trailing slash and **no wildcard**. A wildcard is rejected when the application starts.
 - Allowed methods: `GET`, `POST`, `PUT`, `DELETE`, `OPTIONS`. Allowed request header: `Content-Type`. The page can read the `Location` response header. The `Authorization` header is added with authentication in phase 6.

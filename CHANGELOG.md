@@ -12,6 +12,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 - **Conformance to the shared contract** ([biblioteca-contrato](https://github.com/caronteisback/biblioteca-contrato) 0.1.1): a pinned copy under `src/test/resources/contrato/` and a test that calls the real API and checks every status, body, error code, header and request body against it. Writing it found that every successful answer was declared as `*/*`; it is now `application/json`.
 
+- **CORS:** the Vite development server of the React frontend (`http://localhost:5173`, `http://127.0.0.1:5173`) is now in the default allowed origins.
+
 ### Tests
 
 - 307 tests: 24 new ones check that the document is valid, complete and hidden outside `dev`, and that the API follows the contract.
