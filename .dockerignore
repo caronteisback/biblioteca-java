@@ -1,0 +1,16 @@
+# Never send secrets or local state to the build, and never let them reach the image
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+.gitattributes
+.idea
+.vscode
+*.iml
+
+target
+docs
+*.md
+HELP.md

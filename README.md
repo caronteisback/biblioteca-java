@@ -13,8 +13,9 @@ REST API for a library system (books, copies, members and loans), built with **J
 | B2a | Business parameters, clock, error model (`{code, message}`), score, fine and alert calculation | Done |
 | B2b | Catalog and members: services and REST controllers | Done |
 | B2c | Loans, renewals, returns and fines, with concurrency tests | Done |
-| C | OpenAPI documentation, final README review, release | Next |
-| C | OpenAPI documentation, integration tests for the loan flow, final README | Planned |
+| C2 | Configurable CORS for the browser frontend, Dockerfile and production profile | Done |
+| C3 | CI with GitHub Actions, final README review, license, release | Next |
+| C1 | OpenAPI document and Swagger UI (kept short, just before the shared contract) | Planned |
 
 ## Documentation
 
@@ -111,6 +112,24 @@ curl http://localhost:8080/api/v1/socios/1
 Every failure answers `{"code": "...", "message": "..."}` with the right status; see [API conventions](docs/api-conventions.md) and the error catalog in [business rules](docs/business-rules.md).
 
 Stop the database with `docker compose down`. To wipe all data and re-run initialization, use `docker compose down -v`.
+
+## Run in a container
+
+The image uses JDK 17, runs as a user without privileges and has a health check. It contains no secret: the database comes from the environment, and the `prod` profile (the image default) stops at startup if a variable is missing.
+
+```bash
+docker build -t biblioteca-java .
+
+docker run -d --name biblioteca-api --network biblioteca-java_default -p 8080:8080 \
+  -e DB_URL=jdbc:oracle:thin:@//oracle:1521/XEPDB1 \
+  -e APP_USER=biblioteca \
+  -e APP_USER_PASSWORD=<the value in your .env> \
+  biblioteca-java
+```
+
+The `--network` flag puts the container on the network of `docker compose up -d`, where the database is reachable as `oracle`. The complete compose file (database, both backends and the frontend) comes in phase 6.
+
+To let a browser page call the API from another origin, set `BIBLIOTECA_CORS_ORIGENES_PERMITIDOS` (comma-separated, no wildcard). See [API conventions](docs/api-conventions.md#browser-access-cors).
 
 ## Tests
 
