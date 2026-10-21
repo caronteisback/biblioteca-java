@@ -13,7 +13,7 @@ info:
     name: MIT
     url: https://opensource.org/license/mit
   title: Biblioteca API
-  version: 0.1.0
+  version: 0.1.1
 servers:
 - description: Local development
   url: http://localhost:8080
@@ -99,7 +99,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/EjemplarResponse"
           description: OK
@@ -146,7 +146,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/EjemplarResponse"
           description: OK
@@ -204,7 +204,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/EjemplarResponse"
           description: OK
@@ -283,7 +283,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/PaginaDtoLibroResponse"
           description: OK
@@ -321,7 +321,7 @@ paths:
       responses:
         "201":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/LibroResponse"
           description: Created.
@@ -434,7 +434,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/LibroResponse"
           description: OK
@@ -486,7 +486,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/LibroResponse"
           description: OK
@@ -571,7 +571,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/PaginaDtoEjemplarResponse"
           description: OK
@@ -623,7 +623,7 @@ paths:
       responses:
         "201":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/EjemplarResponse"
           description: Created.
@@ -723,7 +723,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/PaginaDtoMultaResponse"
           description: OK
@@ -761,7 +761,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/MultaResponse"
           description: OK
@@ -810,7 +810,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/MultaResponse"
           description: OK
@@ -896,7 +896,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/PaginaDtoPrestamoResponse"
           description: OK
@@ -937,7 +937,7 @@ paths:
       responses:
         "201":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/PrestamoResponse"
           description: Created.
@@ -1034,7 +1034,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/PrestamoResponse"
           description: OK
@@ -1084,7 +1084,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/PrestamoResponse"
           description: OK
@@ -1145,7 +1145,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/PrestamoResponse"
           description: OK
@@ -1239,7 +1239,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/PaginaDtoSocioResumen"
           description: OK
@@ -1277,7 +1277,7 @@ paths:
       responses:
         "201":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/SocioResponse"
           description: Created.
@@ -1394,7 +1394,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/SocioResponse"
           description: OK
@@ -1446,7 +1446,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/SocioResponse"
           description: OK
@@ -1513,7 +1513,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/SocioResponse"
           description: OK
@@ -1571,7 +1571,7 @@ paths:
       responses:
         "200":
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/SocioResponse"
           description: OK

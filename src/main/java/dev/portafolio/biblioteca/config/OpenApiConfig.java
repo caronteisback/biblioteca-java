@@ -47,7 +47,7 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
 	/** Version of the contract (not of the artifact). Raise it when the API changes; see biblioteca-contrato. */
-	static final String API_VERSION = "0.1.0";
+	static final String API_VERSION = "0.1.1";
 
 	@Bean
 	OpenAPI bibliotecaOpenApi() {
@@ -210,12 +210,24 @@ public class OpenApiConfig {
 		if (respuestas.containsKey("201") || respuestas.containsKey("204")) {
 			respuestas.remove("200");
 		}
+		// Without "produces" the library lists every answer as "*/*"; this API only ever writes JSON.
+		respuestas.values().forEach(OpenApiConfig::soloJson);
 		ApiResponse creado = respuestas.get("201");
 		if (creado != null) {
 			creado.addHeaderObject("Location", new Header()
 					.description("URL of the created resource.")
 					.schema(new StringSchema()));
 		}
+	}
+
+	private static void soloJson(ApiResponse respuesta) {
+		Content contenido = respuesta.getContent();
+		if (contenido == null || !contenido.containsKey("*/*")) {
+			return;
+		}
+		Content json = new Content();
+		contenido.forEach((tipo, medio) -> json.addMediaType(tipo.equals("*/*") ? "application/json" : tipo, medio));
+		respuesta.setContent(json);
 	}
 
 	private static void agregarErrores(Operation operation, Set<ErrorCode> codigos) {

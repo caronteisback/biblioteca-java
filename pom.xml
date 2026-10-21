@@ -17,6 +17,7 @@
 		<java.version>17</java.version>
 		<springdoc.version>3.1.1</springdoc.version>
 		<swagger-parser.version>2.1.48</swagger-parser.version>
+		<json-schema-validator.version>2.0.8</json-schema-validator.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -103,6 +104,14 @@
 			<groupId>io.swagger.parser.v3</groupId>
 			<artifactId>swagger-parser</artifactId>
 			<version>${swagger-parser.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<!-- Checks the real answers of the API against the contract (JSON Schema 2020-12, the dialect of OpenAPI 3.1).
+		     Line 2.x on purpose: it uses Jackson 2, like swagger-parser, and the 3.x line needs a newer Jackson 3 than Spring Boot manages. -->
+		<dependency>
+			<groupId>com.networknt</groupId>
+			<artifactId>json-schema-validator</artifactId>
+			<version>${json-schema-validator.version}</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

@@ -133,6 +133,11 @@ class OpenApiDocumentTests extends BaseIntegracionTest {
 	}
 
 	@Test
+	void everyAnswerIsDeclaredAsJsonNeverAsAnyMediaType() throws Exception {
+		assertThat(generado()).doesNotContain("'*/*'");
+	}
+
+	@Test
 	void creationsAnswer201WithLocationAndDeletesAnswer204() throws Exception {
 		operaciones(documento()).forEach((nombre, operacion) -> {
 			Map<String, ApiResponse> respuestas = operacion.getResponses();

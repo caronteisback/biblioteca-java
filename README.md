@@ -123,6 +123,12 @@ The committed copy cannot drift: a test generates the document and fails if it d
 ./mvnw test -Dtest=OpenApiDocumentTests -Dopenapi.update=true
 ```
 
+### The shared contract
+
+The authoritative description of the API lives in its own repository, [biblioteca-contrato](https://github.com/caronteisback/biblioteca-contrato), so that other backends and the frontend follow the same text. This project keeps a **pinned copy** of one tagged version in [`src/test/resources/contrato/`](src/test/resources/contrato/) (the tag and a SHA-256 are in `contrato.properties`) and proves the API follows it: `ContratoTests` calls the real API against Oracle and checks every status, every body (no undocumented field allowed), every error code and every request body against the contract, and fails if an operation of the contract is not exercised. A copy edited by hand, or an operation present on one side only, also fails.
+
+To adopt a new version of the contract, copy its `openapi.yaml` and update the three lines of `contrato.properties` in the same commit. To change the API, change the contract first (a new tagged version) and then the code.
+
 ## Run in a container
 
 The image uses JDK 17, runs as a user without privileges and has a health check. It contains no secret: the database comes from the environment, and the `prod` profile (the image default) stops at startup if a variable is missing.
@@ -166,6 +172,7 @@ controller  ->  service  ->  repository  ->  Oracle XE
 | Schema | Every rule the database enforces by itself; each rejection is checked by the constraint name Oracle reports |
 | Services (real Oracle) | Each rule at its exact boundary (5th and 6th loan, score 50 and 49, due today and due yesterday), the order of the eight checks, every error code |
 | Controllers (mocked services) | The HTTP contract: statuses, JSON, validation, CORS |
+| Contract | The API against the pinned copy of the shared contract: statuses, bodies, error codes, headers and request bodies of every operation |
 | OpenAPI | The document is valid, lists exactly the 26 operations, documents the errors and required fields, matches the committed copy, and is hidden outside `dev` |
 | Whole path | HTTP to Oracle with the real error handler, including the full life of a loan |
 | Concurrency | Real threads on Oracle: one copy and eight members, six loans for one member, double return, double renewal, double payment, retiring a copy while it is lent, a lock held too long |
@@ -200,7 +207,7 @@ Everything is in [`docs/`](docs/README.md): [business rules](docs/business-rules
 
 ## Roadmap
 
-- **Next:** move the OpenAPI document to its own repository, `biblioteca-contrato`, as the shared contract for the other backend and the frontend, with a test here that checks the API against it.
+- **Next:** the Python implementation of the same API (`biblioteca-python`), checked against the same contract.
 - **Later:** authentication with JWT and roles, a complete `docker compose` with every component, and a browser frontend.
 
 ## Troubleshooting

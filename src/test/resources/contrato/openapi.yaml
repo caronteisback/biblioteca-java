@@ -1,0 +1,2212 @@
+openapi: 3.1.0
+info:
+  description: |
+    REST API of a small library: books, copies, members, loans, renewals, returns and fines.
+    All data is fictional.
+
+    **Errors.** Every failure answers `{ "code": "...", "message": "..." }`. The `code` is stable and meant for programs; the `message` is English text for people. Each operation lists the codes it can return.
+
+    **Dates** are days (`yyyy-MM-dd`) in the `America/Lima` zone and always come from the server, never from the client.
+
+    **Calculated, never stored:** the member score and alerts, the loan alerts and the copy availability.
+  license:
+    name: MIT
+    url: https://opensource.org/license/mit
+  title: Biblioteca API
+  version: 0.1.1
+servers:
+- description: Local development
+  url: http://localhost:8080
+security: []
+tags:
+- description: "Titles of the catalog, identified by ISBN."
+  name: Books
+- description: Physical copies of a book. Loans are made on copies.
+  name: Copies
+- description: "People who can borrow, with their score and alerts."
+  name: Members
+- description: "Lending, renewing and returning a copy."
+  name: Loans
+- description: Fines created by late returns.
+  name: Fines
+paths:
+  /api/v1/ejemplares/{id}:
+    delete:
+      description: "A copy that appears in any loan is never deleted, only retired."
+      operationId: deleteCopy
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: Deleted.
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                COPY_NOT_FOUND:
+                  $ref: "#/components/examples/COPY_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `COPY_NOT_FOUND`."
+        "409":
+          content:
+            application/json:
+              examples:
+                CONCURRENT_UPDATE:
+                  $ref: "#/components/examples/CONCURRENT_UPDATE"
+                COPY_HAS_HISTORY:
+                  $ref: "#/components/examples/COPY_HAS_HISTORY"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `COPY_HAS_HISTORY`, `CONCURRENT_UPDATE`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Delete a copy
+      tags:
+      - Copies
+    get:
+      description: "`disponible` is calculated: the copy is active and has no active\
+        \ loan."
+      operationId: getCopy
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EjemplarResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                COPY_NOT_FOUND:
+                  $ref: "#/components/examples/COPY_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `COPY_NOT_FOUND`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Get a copy
+      tags:
+      - Copies
+  /api/v1/ejemplares/{id}/alta:
+    post:
+      operationId: restoreCopy
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EjemplarResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                COPY_NOT_FOUND:
+                  $ref: "#/components/examples/COPY_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `COPY_NOT_FOUND`."
+        "409":
+          content:
+            application/json:
+              examples:
+                CONCURRENT_UPDATE:
+                  $ref: "#/components/examples/CONCURRENT_UPDATE"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `CONCURRENT_UPDATE`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Bring a retired copy back
+      tags:
+      - Copies
+  /api/v1/ejemplares/{id}/baja:
+    post:
+      description: For a damaged or lost copy. A copy that is on loan cannot be retired.
+        Retiring twice is harmless.
+      operationId: retireCopy
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EjemplarResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                COPY_NOT_FOUND:
+                  $ref: "#/components/examples/COPY_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `COPY_NOT_FOUND`."
+        "409":
+          content:
+            application/json:
+              examples:
+                CONCURRENT_UPDATE:
+                  $ref: "#/components/examples/CONCURRENT_UPDATE"
+                COPY_HAS_ACTIVE_LOAN:
+                  $ref: "#/components/examples/COPY_HAS_ACTIVE_LOAN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `COPY_HAS_ACTIVE_LOAN`, `CONCURRENT_UPDATE`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Retire a copy
+      tags:
+      - Copies
+  /api/v1/libros:
+    get:
+      description: Paginated and always ordered by id. A sort parameter is ignored.
+      operationId: listBooks
+      parameters:
+      - description: "Text that the title or the author must contain, ignoring case.\
+          \ `%` and `_` are literal."
+        in: query
+        name: q
+        required: false
+        schema:
+          type: string
+      - description: "Page number, starting at 0."
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - description: "Page size, from 1 to 100."
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginaDtoLibroResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: List books
+      tags:
+      - Books
+    post:
+      description: The ISBN may be written with hyphens or spaces; it is stored as
+        10 or 13 characters (a 10-digit ISBN may end in X).
+      operationId: createBook
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LibroRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LibroResponse"
+          description: Created.
+          headers:
+            Location:
+              description: URL of the created resource.
+              schema:
+                type: string
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "409":
+          content:
+            application/json:
+              examples:
+                DUPLICATE_ISBN:
+                  $ref: "#/components/examples/DUPLICATE_ISBN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `DUPLICATE_ISBN`."
+        "415":
+          content:
+            application/json:
+              examples:
+                UNSUPPORTED_MEDIA_TYPE:
+                  $ref: "#/components/examples/UNSUPPORTED_MEDIA_TYPE"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNSUPPORTED_MEDIA_TYPE`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Create a book
+      tags:
+      - Books
+  /api/v1/libros/{id}:
+    delete:
+      description: Only a book without copies can be deleted.
+      operationId: deleteBook
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: Deleted.
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                BOOK_NOT_FOUND:
+                  $ref: "#/components/examples/BOOK_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `BOOK_NOT_FOUND`."
+        "409":
+          content:
+            application/json:
+              examples:
+                BOOK_HAS_COPIES:
+                  $ref: "#/components/examples/BOOK_HAS_COPIES"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `BOOK_HAS_COPIES`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Delete a book
+      tags:
+      - Books
+    get:
+      operationId: getBook
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LibroResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                BOOK_NOT_FOUND:
+                  $ref: "#/components/examples/BOOK_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `BOOK_NOT_FOUND`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Get a book
+      tags:
+      - Books
+    put:
+      operationId: updateBook
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LibroRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LibroResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                BOOK_NOT_FOUND:
+                  $ref: "#/components/examples/BOOK_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `BOOK_NOT_FOUND`."
+        "409":
+          content:
+            application/json:
+              examples:
+                DUPLICATE_ISBN:
+                  $ref: "#/components/examples/DUPLICATE_ISBN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `DUPLICATE_ISBN`."
+        "415":
+          content:
+            application/json:
+              examples:
+                UNSUPPORTED_MEDIA_TYPE:
+                  $ref: "#/components/examples/UNSUPPORTED_MEDIA_TYPE"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNSUPPORTED_MEDIA_TYPE`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Replace the data of a book
+      tags:
+      - Books
+  /api/v1/libros/{libroId}/ejemplares:
+    get:
+      description: Paginated and always ordered by id.
+      operationId: listCopiesOfBook
+      parameters:
+      - in: path
+        name: libroId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - description: "Page number, starting at 0."
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - description: "Page size, from 1 to 100."
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginaDtoEjemplarResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                BOOK_NOT_FOUND:
+                  $ref: "#/components/examples/BOOK_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `BOOK_NOT_FOUND`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: List the copies of a book
+      tags:
+      - Copies
+    post:
+      operationId: createCopy
+      parameters:
+      - in: path
+        name: libroId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EjemplarRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EjemplarResponse"
+          description: Created.
+          headers:
+            Location:
+              description: URL of the created resource.
+              schema:
+                type: string
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                BOOK_NOT_FOUND:
+                  $ref: "#/components/examples/BOOK_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `BOOK_NOT_FOUND`."
+        "409":
+          content:
+            application/json:
+              examples:
+                DUPLICATE_COPY_CODE:
+                  $ref: "#/components/examples/DUPLICATE_COPY_CODE"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `DUPLICATE_COPY_CODE`."
+        "415":
+          content:
+            application/json:
+              examples:
+                UNSUPPORTED_MEDIA_TYPE:
+                  $ref: "#/components/examples/UNSUPPORTED_MEDIA_TYPE"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNSUPPORTED_MEDIA_TYPE`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Add a copy to a book
+      tags:
+      - Copies
+  /api/v1/multas:
+    get:
+      description: Paginated and always ordered by id.
+      operationId: listFines
+      parameters:
+      - description: Only the fines of the loans of this member.
+        in: query
+        name: socioId
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - description: Only the fines in this status.
+        in: query
+        name: estado
+        required: false
+        schema:
+          type: string
+          enum:
+          - PENDING
+          - PAID
+      - description: "Page number, starting at 0."
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - description: "Page size, from 1 to 100."
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginaDtoMultaResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: List fines
+      tags:
+      - Fines
+  /api/v1/multas/{id}:
+    get:
+      operationId: getFine
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MultaResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                FINE_NOT_FOUND:
+                  $ref: "#/components/examples/FINE_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FINE_NOT_FOUND`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Get a fine
+      tags:
+      - Fines
+  /api/v1/multas/{id}/pago:
+    post:
+      description: "Pays the whole amount: there is no payment gateway and no partial\
+        \ payment. Paying unblocks new loans but does not give score points back."
+      operationId: payFine
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MultaResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                FINE_NOT_FOUND:
+                  $ref: "#/components/examples/FINE_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FINE_NOT_FOUND`."
+        "409":
+          content:
+            application/json:
+              examples:
+                CONCURRENT_UPDATE:
+                  $ref: "#/components/examples/CONCURRENT_UPDATE"
+                FINE_ALREADY_PAID:
+                  $ref: "#/components/examples/FINE_ALREADY_PAID"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FINE_ALREADY_PAID`, `CONCURRENT_UPDATE`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Pay a fine
+      tags:
+      - Fines
+  /api/v1/prestamos:
+    get:
+      description: Paginated and always ordered by id.
+      operationId: listLoans
+      parameters:
+      - description: Only the loans of this member.
+        in: query
+        name: socioId
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - description: "`true` lists the loans not yet returned, `false` the returned\
+          \ ones; leave it out for all."
+        in: query
+        name: activo
+        required: false
+        schema:
+          type: boolean
+      - description: "Page number, starting at 0."
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - description: "Page size, from 1 to 100."
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginaDtoPrestamoResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: List loans
+      tags:
+      - Loans
+    post:
+      description: "Eight checks run in a fixed order and the first that fails decides\
+        \ the error: member and copy exist, member active, copy active, copy not on\
+        \ loan, no overdue loan, no pending fine, score at least the minimum, fewer\
+        \ than the maximum active loans. Nothing is written if one fails. The loan\
+        \ date is today and the due date is 14 days later, both set by the server."
+      operationId: createLoan
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PrestamoRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrestamoResponse"
+          description: Created.
+          headers:
+            Location:
+              description: URL of the created resource.
+              schema:
+                type: string
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                COPY_NOT_FOUND:
+                  $ref: "#/components/examples/COPY_NOT_FOUND"
+                MEMBER_NOT_FOUND:
+                  $ref: "#/components/examples/MEMBER_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `MEMBER_NOT_FOUND`, `COPY_NOT_FOUND`."
+        "409":
+          content:
+            application/json:
+              examples:
+                CONCURRENT_UPDATE:
+                  $ref: "#/components/examples/CONCURRENT_UPDATE"
+                COPY_ALREADY_ON_LOAN:
+                  $ref: "#/components/examples/COPY_ALREADY_ON_LOAN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `COPY_ALREADY_ON_LOAN`, `CONCURRENT_UPDATE`."
+        "415":
+          content:
+            application/json:
+              examples:
+                UNSUPPORTED_MEDIA_TYPE:
+                  $ref: "#/components/examples/UNSUPPORTED_MEDIA_TYPE"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNSUPPORTED_MEDIA_TYPE`."
+        "422":
+          content:
+            application/json:
+              examples:
+                COPY_INACTIVE:
+                  $ref: "#/components/examples/COPY_INACTIVE"
+                LOAN_LIMIT_REACHED:
+                  $ref: "#/components/examples/LOAN_LIMIT_REACHED"
+                MEMBER_BLOCKED_BY_SCORE:
+                  $ref: "#/components/examples/MEMBER_BLOCKED_BY_SCORE"
+                MEMBER_HAS_OVERDUE_LOAN:
+                  $ref: "#/components/examples/MEMBER_HAS_OVERDUE_LOAN"
+                MEMBER_HAS_PENDING_FINE:
+                  $ref: "#/components/examples/MEMBER_HAS_PENDING_FINE"
+                MEMBER_INACTIVE:
+                  $ref: "#/components/examples/MEMBER_INACTIVE"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `MEMBER_INACTIVE`, `COPY_INACTIVE`,\
+            \ `MEMBER_HAS_OVERDUE_LOAN`, `MEMBER_HAS_PENDING_FINE`, `MEMBER_BLOCKED_BY_SCORE`,\
+            \ `LOAN_LIMIT_REACHED`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Lend a copy to a member
+      tags:
+      - Loans
+  /api/v1/prestamos/{id}:
+    get:
+      description: "Includes the days of delay as of today, the alerts, and the fine\
+        \ when the loan was returned late."
+      operationId: getLoan
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrestamoResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                LOAN_NOT_FOUND:
+                  $ref: "#/components/examples/LOAN_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `LOAN_NOT_FOUND`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Get a loan
+      tags:
+      - Loans
+  /api/v1/prestamos/{id}/devolucion:
+    post:
+      description: "Always accepted for an active loan, even if the member or the\
+        \ copy were deactivated meanwhile. A return after the due date creates a fine\
+        \ of one sol per day late; returning on the due date is on time."
+      operationId: returnLoan
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrestamoResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                LOAN_NOT_FOUND:
+                  $ref: "#/components/examples/LOAN_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `LOAN_NOT_FOUND`."
+        "409":
+          content:
+            application/json:
+              examples:
+                CONCURRENT_UPDATE:
+                  $ref: "#/components/examples/CONCURRENT_UPDATE"
+                LOAN_ALREADY_RETURNED:
+                  $ref: "#/components/examples/LOAN_ALREADY_RETURNED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `LOAN_ALREADY_RETURNED`, `CONCURRENT_UPDATE`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Return a loan
+      tags:
+      - Loans
+  /api/v1/prestamos/{id}/renovacion:
+    post:
+      description: "Adds one term to the current due date (not to today), up to the\
+        \ maximum number of renewals. It never creates a new loan. A fine or a low\
+        \ score do not block a renewal."
+      operationId: renewLoan
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrestamoResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                LOAN_NOT_FOUND:
+                  $ref: "#/components/examples/LOAN_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `LOAN_NOT_FOUND`."
+        "409":
+          content:
+            application/json:
+              examples:
+                CONCURRENT_UPDATE:
+                  $ref: "#/components/examples/CONCURRENT_UPDATE"
+                LOAN_ALREADY_RETURNED:
+                  $ref: "#/components/examples/LOAN_ALREADY_RETURNED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `LOAN_ALREADY_RETURNED`, `CONCURRENT_UPDATE`."
+        "422":
+          content:
+            application/json:
+              examples:
+                MEMBER_INACTIVE:
+                  $ref: "#/components/examples/MEMBER_INACTIVE"
+                RENEWAL_LIMIT_REACHED:
+                  $ref: "#/components/examples/RENEWAL_LIMIT_REACHED"
+                RENEWAL_NOT_ALLOWED_OVERDUE:
+                  $ref: "#/components/examples/RENEWAL_NOT_ALLOWED_OVERDUE"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `MEMBER_INACTIVE`, `RENEWAL_NOT_ALLOWED_OVERDUE`,\
+            \ `RENEWAL_LIMIT_REACHED`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Renew a loan
+      tags:
+      - Loans
+  /api/v1/socios:
+    get:
+      description: "Paginated and always ordered by id. A row carries no score: calculating\
+        \ it needs the whole loan history, so ask for one member to get it."
+      operationId: listMembers
+      parameters:
+      - description: "Text that the name or the email must contain, ignoring case.\
+          \ `%` and `_` are literal."
+        in: query
+        name: q
+        required: false
+        schema:
+          type: string
+      - description: "Page number, starting at 0."
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - description: "Page size, from 1 to 100."
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginaDtoSocioResumen"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: List members
+      tags:
+      - Members
+    post:
+      description: "The registration date is today, set by the server. The answer\
+        \ carries score 100 and no alerts."
+      operationId: createMember
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SocioRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SocioResponse"
+          description: Created.
+          headers:
+            Location:
+              description: URL of the created resource.
+              schema:
+                type: string
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "409":
+          content:
+            application/json:
+              examples:
+                DUPLICATE_EMAIL:
+                  $ref: "#/components/examples/DUPLICATE_EMAIL"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `DUPLICATE_EMAIL`."
+        "415":
+          content:
+            application/json:
+              examples:
+                UNSUPPORTED_MEDIA_TYPE:
+                  $ref: "#/components/examples/UNSUPPORTED_MEDIA_TYPE"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNSUPPORTED_MEDIA_TYPE`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Register a member
+      tags:
+      - Members
+  /api/v1/socios/{id}:
+    delete:
+      description: "A member that appears in any loan is never deleted, only deactivated."
+      operationId: deleteMember
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: Deleted.
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                MEMBER_NOT_FOUND:
+                  $ref: "#/components/examples/MEMBER_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `MEMBER_NOT_FOUND`."
+        "409":
+          content:
+            application/json:
+              examples:
+                CONCURRENT_UPDATE:
+                  $ref: "#/components/examples/CONCURRENT_UPDATE"
+                MEMBER_HAS_HISTORY:
+                  $ref: "#/components/examples/MEMBER_HAS_HISTORY"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `MEMBER_HAS_HISTORY`, `CONCURRENT_UPDATE`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Delete a member
+      tags:
+      - Members
+    get:
+      description: The score and the alerts are calculated now from the loan history
+        and are never stored.
+      operationId: getMember
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SocioResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                MEMBER_NOT_FOUND:
+                  $ref: "#/components/examples/MEMBER_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `MEMBER_NOT_FOUND`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Get a member with score and alerts
+      tags:
+      - Members
+    put:
+      operationId: updateMember
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SocioRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SocioResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                MEMBER_NOT_FOUND:
+                  $ref: "#/components/examples/MEMBER_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `MEMBER_NOT_FOUND`."
+        "409":
+          content:
+            application/json:
+              examples:
+                DUPLICATE_EMAIL:
+                  $ref: "#/components/examples/DUPLICATE_EMAIL"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `DUPLICATE_EMAIL`."
+        "415":
+          content:
+            application/json:
+              examples:
+                UNSUPPORTED_MEDIA_TYPE:
+                  $ref: "#/components/examples/UNSUPPORTED_MEDIA_TYPE"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNSUPPORTED_MEDIA_TYPE`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Replace the name and the email of a member
+      tags:
+      - Members
+  /api/v1/socios/{id}/desactivar:
+    post:
+      description: "A member with active loans cannot be deactivated. An inactive\
+        \ member cannot borrow or renew, but can still return."
+      operationId: deactivateMember
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SocioResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                MEMBER_NOT_FOUND:
+                  $ref: "#/components/examples/MEMBER_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `MEMBER_NOT_FOUND`."
+        "409":
+          content:
+            application/json:
+              examples:
+                CONCURRENT_UPDATE:
+                  $ref: "#/components/examples/CONCURRENT_UPDATE"
+                MEMBER_HAS_ACTIVE_LOANS:
+                  $ref: "#/components/examples/MEMBER_HAS_ACTIVE_LOANS"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `MEMBER_HAS_ACTIVE_LOANS`, `CONCURRENT_UPDATE`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Deactivate a member
+      tags:
+      - Members
+  /api/v1/socios/{id}/reactivar:
+    post:
+      operationId: reactivateMember
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SocioResponse"
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                VALIDATION_ERROR:
+                  $ref: "#/components/examples/VALIDATION_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `VALIDATION_ERROR`."
+        "404":
+          content:
+            application/json:
+              examples:
+                MEMBER_NOT_FOUND:
+                  $ref: "#/components/examples/MEMBER_NOT_FOUND"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `MEMBER_NOT_FOUND`."
+        "409":
+          content:
+            application/json:
+              examples:
+                CONCURRENT_UPDATE:
+                  $ref: "#/components/examples/CONCURRENT_UPDATE"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `CONCURRENT_UPDATE`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      summary: Reactivate a member
+      tags:
+      - Members
+components:
+  examples:
+    BOOK_HAS_COPIES:
+      summary: BOOK_HAS_COPIES
+      value:
+        code: BOOK_HAS_COPIES
+        message: The book has copies and cannot be deleted.
+    BOOK_NOT_FOUND:
+      summary: BOOK_NOT_FOUND
+      value:
+        code: BOOK_NOT_FOUND
+        message: The book does not exist.
+    CONCURRENT_UPDATE:
+      summary: CONCURRENT_UPDATE
+      value:
+        code: CONCURRENT_UPDATE
+        message: Another request is updating the same record. Try again.
+    COPY_ALREADY_ON_LOAN:
+      summary: COPY_ALREADY_ON_LOAN
+      value:
+        code: COPY_ALREADY_ON_LOAN
+        message: The copy already has an active loan.
+    COPY_HAS_ACTIVE_LOAN:
+      summary: COPY_HAS_ACTIVE_LOAN
+      value:
+        code: COPY_HAS_ACTIVE_LOAN
+        message: The copy is on loan and cannot be retired.
+    COPY_HAS_HISTORY:
+      summary: COPY_HAS_HISTORY
+      value:
+        code: COPY_HAS_HISTORY
+        message: The copy appears in loans and cannot be deleted.
+    COPY_INACTIVE:
+      summary: COPY_INACTIVE
+      value:
+        code: COPY_INACTIVE
+        message: The copy is retired.
+    COPY_NOT_FOUND:
+      summary: COPY_NOT_FOUND
+      value:
+        code: COPY_NOT_FOUND
+        message: The copy does not exist.
+    DUPLICATE_COPY_CODE:
+      summary: DUPLICATE_COPY_CODE
+      value:
+        code: DUPLICATE_COPY_CODE
+        message: A copy with that code already exists.
+    DUPLICATE_EMAIL:
+      summary: DUPLICATE_EMAIL
+      value:
+        code: DUPLICATE_EMAIL
+        message: A member with that email already exists.
+    DUPLICATE_ISBN:
+      summary: DUPLICATE_ISBN
+      value:
+        code: DUPLICATE_ISBN
+        message: A book with that ISBN already exists.
+    FINE_ALREADY_PAID:
+      summary: FINE_ALREADY_PAID
+      value:
+        code: FINE_ALREADY_PAID
+        message: The fine is already paid.
+    FINE_NOT_FOUND:
+      summary: FINE_NOT_FOUND
+      value:
+        code: FINE_NOT_FOUND
+        message: The fine does not exist.
+    INTERNAL_ERROR:
+      summary: INTERNAL_ERROR
+      value:
+        code: INTERNAL_ERROR
+        message: An unexpected error occurred.
+    LOAN_ALREADY_RETURNED:
+      summary: LOAN_ALREADY_RETURNED
+      value:
+        code: LOAN_ALREADY_RETURNED
+        message: The loan was already returned.
+    LOAN_LIMIT_REACHED:
+      summary: LOAN_LIMIT_REACHED
+      value:
+        code: LOAN_LIMIT_REACHED
+        message: The member already has the maximum number of active loans.
+    LOAN_NOT_FOUND:
+      summary: LOAN_NOT_FOUND
+      value:
+        code: LOAN_NOT_FOUND
+        message: The loan does not exist.
+    MEMBER_BLOCKED_BY_SCORE:
+      summary: MEMBER_BLOCKED_BY_SCORE
+      value:
+        code: MEMBER_BLOCKED_BY_SCORE
+        message: The member's score is below the minimum to borrow.
+    MEMBER_HAS_ACTIVE_LOANS:
+      summary: MEMBER_HAS_ACTIVE_LOANS
+      value:
+        code: MEMBER_HAS_ACTIVE_LOANS
+        message: The member has active loans and cannot be deactivated.
+    MEMBER_HAS_HISTORY:
+      summary: MEMBER_HAS_HISTORY
+      value:
+        code: MEMBER_HAS_HISTORY
+        message: The member appears in loans and cannot be deleted.
+    MEMBER_HAS_OVERDUE_LOAN:
+      summary: MEMBER_HAS_OVERDUE_LOAN
+      value:
+        code: MEMBER_HAS_OVERDUE_LOAN
+        message: The member has an overdue loan.
+    MEMBER_HAS_PENDING_FINE:
+      summary: MEMBER_HAS_PENDING_FINE
+      value:
+        code: MEMBER_HAS_PENDING_FINE
+        message: The member has a pending fine.
+    MEMBER_INACTIVE:
+      summary: MEMBER_INACTIVE
+      value:
+        code: MEMBER_INACTIVE
+        message: The member is not active.
+    MEMBER_NOT_FOUND:
+      summary: MEMBER_NOT_FOUND
+      value:
+        code: MEMBER_NOT_FOUND
+        message: The member does not exist.
+    RENEWAL_LIMIT_REACHED:
+      summary: RENEWAL_LIMIT_REACHED
+      value:
+        code: RENEWAL_LIMIT_REACHED
+        message: The loan already used all its renewals.
+    RENEWAL_NOT_ALLOWED_OVERDUE:
+      summary: RENEWAL_NOT_ALLOWED_OVERDUE
+      value:
+        code: RENEWAL_NOT_ALLOWED_OVERDUE
+        message: An overdue loan cannot be renewed. Return it first.
+    UNSUPPORTED_MEDIA_TYPE:
+      summary: UNSUPPORTED_MEDIA_TYPE
+      value:
+        code: UNSUPPORTED_MEDIA_TYPE
+        message: The content type is not supported. Use application/json.
+    VALIDATION_ERROR:
+      summary: VALIDATION_ERROR
+      value:
+        code: VALIDATION_ERROR
+        message: The request is not valid.
+  schemas:
+    Alerta:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - DUE_SOON
+          - OVERDUE
+          - PENDING_FINE
+          - LOW_SCORE
+        message:
+          type: string
+      required:
+      - code
+      - message
+    EjemplarRequest:
+      type: object
+      properties:
+        codigo:
+          type: string
+          maxLength: 30
+          minLength: 0
+      required:
+      - codigo
+    EjemplarResponse:
+      type: object
+      properties:
+        activo:
+          type: boolean
+          description: False when the copy was retired (damaged or lost).
+        codigo:
+          type: string
+        disponible:
+          type: boolean
+          description: "Calculated: the copy is active and has no active loan. Never\
+            \ stored."
+        id:
+          type: integer
+          format: int64
+        libroId:
+          type: integer
+          format: int64
+      required:
+      - activo
+      - codigo
+      - disponible
+      - id
+      - libroId
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Stable error code. ENDPOINT_NOT_FOUND and METHOD_NOT_ALLOWED\
+            \ can answer any URL, so no operation lists them."
+          enum:
+          - VALIDATION_ERROR
+          - BOOK_NOT_FOUND
+          - COPY_NOT_FOUND
+          - MEMBER_NOT_FOUND
+          - LOAN_NOT_FOUND
+          - FINE_NOT_FOUND
+          - ENDPOINT_NOT_FOUND
+          - METHOD_NOT_ALLOWED
+          - UNSUPPORTED_MEDIA_TYPE
+          - COPY_ALREADY_ON_LOAN
+          - LOAN_ALREADY_RETURNED
+          - FINE_ALREADY_PAID
+          - DUPLICATE_ISBN
+          - DUPLICATE_EMAIL
+          - DUPLICATE_COPY_CODE
+          - BOOK_HAS_COPIES
+          - COPY_HAS_HISTORY
+          - COPY_HAS_ACTIVE_LOAN
+          - MEMBER_HAS_HISTORY
+          - MEMBER_HAS_ACTIVE_LOANS
+          - CONCURRENT_UPDATE
+          - MEMBER_INACTIVE
+          - COPY_INACTIVE
+          - MEMBER_HAS_OVERDUE_LOAN
+          - MEMBER_HAS_PENDING_FINE
+          - MEMBER_BLOCKED_BY_SCORE
+          - LOAN_LIMIT_REACHED
+          - RENEWAL_LIMIT_REACHED
+          - RENEWAL_NOT_ALLOWED_OVERDUE
+          - INTERNAL_ERROR
+        message:
+          type: string
+      required:
+      - code
+      - message
+    LibroRequest:
+      type: object
+      properties:
+        anioPublicacion:
+          type: integer
+          format: int32
+          maximum: 2100
+          minimum: 1000
+        autor:
+          type: string
+          maxLength: 150
+          minLength: 0
+        isbn:
+          type: string
+          maxLength: 20
+          minLength: 0
+        titulo:
+          type: string
+          maxLength: 200
+          minLength: 0
+      required:
+      - autor
+      - isbn
+      - titulo
+    LibroResponse:
+      type: object
+      properties:
+        anioPublicacion:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: "Year of publication, when known."
+        autor:
+          type: string
+        id:
+          type: integer
+          format: int64
+        isbn:
+          type: string
+          description: "Stored without hyphens or spaces: 10 or 13 characters."
+          example: "9780306406157"
+        titulo:
+          type: string
+      required:
+      - autor
+      - id
+      - isbn
+      - titulo
+    MultaResponse:
+      type: object
+      properties:
+        diasRetraso:
+          type: integer
+          format: int32
+          description: Days late that the fine charges.
+          minimum: 1
+        estado:
+          type: string
+          enum:
+          - PENDING
+          - PAID
+        fechaGeneracion:
+          type: string
+          format: date
+          description: "Day the fine was created: the day of the late return."
+        fechaPago:
+          type:
+          - string
+          - "null"
+          format: date
+          description: Day the fine was paid; null while it is pending.
+        id:
+          type: integer
+          format: int64
+        monto:
+          type: number
+          description: "Amount in soles: days late times the fine per day."
+          example: 5.0
+        prestamoId:
+          type: integer
+          format: int64
+      required:
+      - diasRetraso
+      - estado
+      - fechaGeneracion
+      - id
+      - monto
+      - prestamoId
+    PaginaDtoEjemplarResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EjemplarResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+      required:
+      - items
+      - page
+      - size
+      - totalElements
+      - totalPages
+    PaginaDtoLibroResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LibroResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+      required:
+      - items
+      - page
+      - size
+      - totalElements
+      - totalPages
+    PaginaDtoMultaResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MultaResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+      required:
+      - items
+      - page
+      - size
+      - totalElements
+      - totalPages
+    PaginaDtoPrestamoResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PrestamoResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+      required:
+      - items
+      - page
+      - size
+      - totalElements
+      - totalPages
+    PaginaDtoSocioResumen:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SocioResumen"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+      required:
+      - items
+      - page
+      - size
+      - totalElements
+      - totalPages
+    PrestamoRequest:
+      type: object
+      properties:
+        ejemplarId:
+          type: integer
+          format: int64
+          exclusiveMinimum: 0
+        socioId:
+          type: integer
+          format: int64
+          exclusiveMinimum: 0
+      required:
+      - ejemplarId
+      - socioId
+    PrestamoResponse:
+      type: object
+      properties:
+        activo:
+          type: boolean
+          description: True while the copy has not been returned.
+        alertas:
+          type: array
+          description: DUE_SOON or OVERDUE for an active loan; empty once returned.
+          items:
+            $ref: "#/components/schemas/Alerta"
+        diasRetraso:
+          type: integer
+          format: int32
+          description: "Days late as of today for an active loan, or up to the return\
+            \ date for a returned one. Zero when on time."
+          minimum: 0
+        ejemplarId:
+          type: integer
+          format: int64
+        fechaDevolucion:
+          type:
+          - string
+          - "null"
+          format: date
+          description: Day the copy was returned; null while the loan is active.
+        fechaPrestamo:
+          type: string
+          format: date
+          description: "Day the loan started, set by the server."
+        fechaVencimiento:
+          type: string
+          format: date
+          description: Last day to return without a fine. Each renewal moves it forward.
+        id:
+          type: integer
+          format: int64
+        multa:
+          description: The fine created by a late return; null when the loan was on
+            time or is still active.
+          oneOf:
+          - $ref: "#/components/schemas/MultaResponse"
+          - type: "null"
+        renovaciones:
+          type: integer
+          format: int32
+          description: Renewals used so far.
+          maximum: 3
+          minimum: 0
+        socioId:
+          type: integer
+          format: int64
+      required:
+      - activo
+      - alertas
+      - diasRetraso
+      - ejemplarId
+      - fechaPrestamo
+      - fechaVencimiento
+      - id
+      - renovaciones
+      - socioId
+    SocioRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 150
+          minLength: 0
+        nombre:
+          type: string
+          maxLength: 120
+          minLength: 0
+      required:
+      - email
+      - nombre
+    SocioResponse:
+      type: object
+      properties:
+        activo:
+          type: boolean
+        alertas:
+          type: array
+          description: "PENDING_FINE and LOW_SCORE, calculated now."
+          items:
+            $ref: "#/components/schemas/Alerta"
+        email:
+          type: string
+        fechaRegistro:
+          type: string
+          format: date
+          description: "Day of registration, set by the server."
+        id:
+          type: integer
+          format: int64
+        nombre:
+          type: string
+        score:
+          type: integer
+          format: int32
+          description: "Reliability score from 0 to 100, calculated from the loan\
+            \ history. It only goes down."
+          maximum: 100
+          minimum: 0
+      required:
+      - activo
+      - alertas
+      - email
+      - fechaRegistro
+      - id
+      - nombre
+      - score
+    SocioResumen:
+      type: object
+      properties:
+        activo:
+          type: boolean
+        email:
+          type: string
+        fechaRegistro:
+          type: string
+          format: date
+        id:
+          type: integer
+          format: int64
+        nombre:
+          type: string
+      required:
+      - activo
+      - email
+      - fechaRegistro
+      - id
+      - nombre
