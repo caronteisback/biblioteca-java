@@ -2,6 +2,22 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **OpenAPI 3.1 document** generated from the code: 26 operations with ids, summaries and descriptions, the error codes of each one (with shared examples), `201` with `Location` and `204` where they apply, and `required` on every field that is never null. The `ErrorResponse` schema lists every error code.
+- **Swagger UI** at `/swagger-ui.html` and the document at `/v3/api-docs`, in the `dev` profile only; with `prod` both answer `404`.
+- **`docs/openapi.yaml`**, a committed copy that a test compares with the generated document, so it cannot drift.
+
+### Tests
+
+- 300 tests: 17 new ones check that the document is valid, complete and hidden outside `dev`.
+
+### Changed
+
+- The project version is now `0.2.0-SNAPSHOT`. The API contract version (`0.1.0`) is kept apart from the artifact version.
+
 ## [0.1.0] - 2026-10-21
 
 First complete version of the library API.
@@ -26,5 +42,4 @@ First complete version of the library API.
 ### Known limitations
 
 - The API has no authentication yet and must not be exposed to a network.
-- There is no OpenAPI document yet.
 - The upper bound of the renewals `CHECK` (3) is written in the schema; changing the configured maximum needs a migration.

@@ -1,3 +1,9 @@
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
 spring:
   datasource:
     # XEPDB1 is the pluggable database; connecting to "XE" (the CDB root) fails with ORA-12514/ORA-65096.

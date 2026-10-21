@@ -27,7 +27,7 @@ The rules are written in [docs/business-rules.md](docs/business-rules.md) and ev
 - **Concurrency is designed and tested, not hoped for.** Row locks are taken in one fixed order (member, copy, loan) with a 5-second cap. Nine tests run real threads against Oracle, and removing the locks makes six of them fail, so they do detect the races. An experiment also showed that one lock I had planned was not needed, and the code and docs say so.
 - **Derived data is never stored.** Score, alerts and copy availability are calculated from the history, so they cannot disagree with it.
 - **One error shape.** Every failure answers `{ "code": "...", "message": "..." }` with a stable code and the right status (400, 404, 405, 409, 415, 422, 500), and nothing internal (SQL, constraint names, stack traces) reaches the client.
-- **Real database in tests.** 283 tests run on Oracle XE in Testcontainers, not on an in-memory substitute that hides engine behavior.
+- **Real database in tests.** 300 tests run on Oracle XE in Testcontainers, not on an in-memory substitute that hides engine behavior.
 - **Design first.** Business rules, process flows, sequence diagrams, class and ER diagrams, query plans checked with `DBMS_XPLAN`, and architecture decision records live in [`docs/`](docs/README.md).
 
 ## Quick start
@@ -107,6 +107,22 @@ curl "http://localhost:8080/api/v1/libros?q=faro&size=5"
 
 Statuses, pagination, filters and CORS are in [API conventions](docs/api-conventions.md); the error catalog is in [business rules](docs/business-rules.md#14-error-catalog).
 
+## OpenAPI and Swagger UI
+
+The API describes itself with an [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0) document built from the code: 26 operations, the error codes each one can return, and which fields are always present.
+
+- **Interactive page (Swagger UI):** <http://localhost:8080/swagger-ui.html>, to read and try every operation.
+- **The document itself:** `/v3/api-docs` (JSON) and `/v3/api-docs.yaml`.
+- **A committed copy:** [`docs/openapi.yaml`](docs/openapi.yaml), readable on GitHub without running anything.
+
+Both endpoints exist only in the `dev` profile (the default on your machine). With `prod` they answer `404`, so a deployed API does not advertise its own surface.
+
+The committed copy cannot drift: a test generates the document and fails if it differs from `docs/openapi.yaml`. After changing an endpoint, refresh the file and commit it:
+
+```bash
+./mvnw test -Dtest=OpenApiDocumentTests -Dopenapi.update=true
+```
+
 ## Run in a container
 
 The image uses JDK 17, runs as a user without privileges and has a health check. It contains no secret: the database comes from the environment, and the `prod` profile (the image default) stops at startup if a variable is missing.
@@ -142,7 +158,7 @@ controller  ->  service  ->  repository  ->  Oracle XE
 ./mvnw verify
 ```
 
-283 tests. They start a throwaway Oracle XE 21c container with Testcontainers (Docker must be running; the first run downloads the image), share one container for the whole run and never touch the compose database.
+300 tests. They start a throwaway Oracle XE 21c container with Testcontainers (Docker must be running; the first run downloads the image), share one container for the whole run and never touch the compose database.
 
 | Level | What it proves |
 |-------|----------------|
@@ -150,6 +166,7 @@ controller  ->  service  ->  repository  ->  Oracle XE
 | Schema | Every rule the database enforces by itself; each rejection is checked by the constraint name Oracle reports |
 | Services (real Oracle) | Each rule at its exact boundary (5th and 6th loan, score 50 and 49, due today and due yesterday), the order of the eight checks, every error code |
 | Controllers (mocked services) | The HTTP contract: statuses, JSON, validation, CORS |
+| OpenAPI | The document is valid, lists exactly the 26 operations, documents the errors and required fields, matches the committed copy, and is hidden outside `dev` |
 | Whole path | HTTP to Oracle with the real error handler, including the full life of a loan |
 | Concurrency | Real threads on Oracle: one copy and eight members, six loans for one member, double return, double renewal, double payment, retiring a copy while it is lent, a lock held too long |
 
@@ -179,11 +196,11 @@ Continuous integration runs the same command on every push, and also checks that
 
 ## Documentation
 
-Everything is in [`docs/`](docs/README.md): [business rules](docs/business-rules.md), [process flows](docs/diagrams/process-flows.md), [sequence diagrams](docs/diagrams/sequence-diagrams.md), [class diagram](docs/diagrams/class-diagram.md), [ER diagram](docs/diagrams/er-diagram.md), [query plans](docs/query-plans.md), [API conventions](docs/api-conventions.md) and [architecture decisions](docs/adr/). See also the [CHANGELOG](CHANGELOG.md).
+Everything is in [`docs/`](docs/README.md): [business rules](docs/business-rules.md), [process flows](docs/diagrams/process-flows.md), [sequence diagrams](docs/diagrams/sequence-diagrams.md), [class diagram](docs/diagrams/class-diagram.md), [ER diagram](docs/diagrams/er-diagram.md), [query plans](docs/query-plans.md), [API conventions](docs/api-conventions.md) and [architecture decisions](docs/adr/) and the [OpenAPI document](docs/openapi.yaml). See also the [CHANGELOG](CHANGELOG.md).
 
 ## Roadmap
 
-- **Next:** an OpenAPI document with Swagger UI, which becomes the shared contract for the other backend and the frontend.
+- **Next:** move the OpenAPI document to its own repository, `biblioteca-contrato`, as the shared contract for the other backend and the frontend, with a test here that checks the API against it.
 - **Later:** authentication with JWT and roles, a complete `docker compose` with every component, and a browser frontend.
 
 ## Troubleshooting

@@ -1,6 +1,6 @@
 # API conventions
 
-Rules that every endpoint follows, so a client learns them once. Business behavior is in [business rules](business-rules.md); the full OpenAPI contract arrives in a later part.
+Rules that every endpoint follows, so a client learns them once. Business behavior is in [business rules](business-rules.md); the full contract is the [OpenAPI document](openapi.yaml), generated from the code.
 
 Base path: `/api/v1`. Bodies are `application/json`. The API is open until the authentication phase.
 

@@ -44,6 +44,19 @@ biblioteca:
       - http://localhost:3000
       - http://localhost:8000
 
+# The API description and Swagger UI are off by default. The dev profile turns them on; a real
+# deployment keeps them off unless it decides to publish them.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+    # Keeps the tags and operations in the order of the document instead of re-sorting them in the browser.
+    operations-sorter: method
+  # A stable key order, so the exported openapi.yaml only changes when the API changes.
+  writer-with-order-by-keys: true
+  override-with-generic-response: false
+
 management:
   endpoints:
     web:
