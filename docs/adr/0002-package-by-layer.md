@@ -11,12 +11,14 @@ Classes can be grouped by feature (`libro/`, `prestamo/`, each holding its entit
 Group by **layer** under `dev.portafolio.biblioteca`:
 
 ```
+config/       typed business parameters and the clock
+controller/   REST endpoints and the global error handler
+dto/          request and response records, alerts, the page record
 entity/       @Entity classes, the enum and the equality base class
+exception/    ErrorCode, BusinessException and the constraint translator
 repository/   Spring Data JPA interfaces
-service/      business rules and transactions (next)
-controller/   REST endpoints and error handling (next)
-dto/          request and response records (next)
-exception/    business exceptions (next)
+security/     JWT and roles (empty until phase 6)
+service/      business rules, transactions and the score, fine and alert calculators
 ```
 
 Tests mirror the same packages.

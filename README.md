@@ -33,7 +33,7 @@ controller  ->  service  ->  repository  ->  Oracle XE
                transactions)
 ```
 
-- **Packages by layer** under `dev.portafolio.biblioteca`: `entity`, `repository`, and, as they arrive, `service`, `controller`, `dto` and `exception`. See [ADR 0002](docs/adr/0002-package-by-layer.md).
+- **Packages by layer** under `dev.portafolio.biblioteca`: `config`, `controller`, `dto`, `entity`, `exception`, `repository`, `security` (empty until phase 6) and `service`. See [ADR 0002](docs/adr/0002-package-by-layer.md).
 - **Schema ownership:** Flyway migrations (`src/main/resources/db/migration`) are the only way the schema changes. Hibernate runs with `ddl-auto: validate`.
 - **Configuration:** one `.env` file feeds both `docker compose` and Spring Boot. No credentials live in code or in committed files.
 - **Profiles:** `dev` (default, uses the compose database) and `test` (Testcontainers starts a disposable Oracle XE).
