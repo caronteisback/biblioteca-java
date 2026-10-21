@@ -6,7 +6,7 @@ The three write operations as flowcharts. Each diamond is a check; a failed chec
 
 ```mermaid
 flowchart TD
-  start(["POST /api/v1/prestamos"]) --> lock["Lock the member row"]
+  start(["POST /api/v1/prestamos"]) --> lock["Lock the member row, then the copy row"]
   lock --> c1{"Member and copy exist?"}
   c1 -- no --> e1["404 MEMBER_NOT_FOUND or COPY_NOT_FOUND"]
   c1 -- yes --> c2{"Member active?"}
@@ -32,7 +32,7 @@ flowchart TD
 ```
 
 - The member row stays locked until the transaction commits, so two simultaneous loans for one member cannot pass the limit of 5.
-- Check 4 is also guarded by the unique index: if two requests pass it together, one `INSERT` fails and returns `409 COPY_ALREADY_ON_LOAN`.
+- The copy row is locked too, so two simultaneous requests for the same copy are processed one after the other and the second one fails check 4. The unique index is the last safety net and gives the same `409 COPY_ALREADY_ON_LOAN`.
 
 ## 2. Renew a loan
 
@@ -64,7 +64,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  start(["POST /api/v1/prestamos/{id}/devolucion"]) --> lock["Lock the loan row"]
+  start(["POST /api/v1/prestamos/{id}/devolucion"]) --> lock["Lock the member row, then the loan row"]
   lock --> c1{"Loan exists?"}
   c1 -- no --> e1["404 LOAN_NOT_FOUND"]
   c1 -- yes --> c2{"Loan still active?"}

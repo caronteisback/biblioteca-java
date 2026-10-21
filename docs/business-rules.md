@@ -115,9 +115,12 @@ Alerts are calculated on every query and never stored. Member and loan responses
 
 | Rule | Guarantee |
 |------|-----------|
-| One active loan per copy | Unique function-based index on `prestamo` over `CASE WHEN fecha_devolucion IS NULL THEN ejemplar_id END`. A violation is translated to `409 COPY_ALREADY_ON_LOAN` |
+| One active loan per copy | The copy row is locked while a loan is created, so a second request waits and then fails the normal check with `409 COPY_ALREADY_ON_LOAN`. The unique function-based index on `prestamo` over `CASE WHEN fecha_devolucion IS NULL THEN ejemplar_id END` is the last safety net and is translated to the same error |
 | At most 5 active loans per member | The member row is locked (`PESSIMISTIC_WRITE`) while a loan is created, so a member's loans are processed one at a time |
-| Double return or double renewal | The loan row is locked while it is returned or renewed; the second request sees the new state |
+| A copy cannot be retired while it is being lent | Retiring and lending both lock the copy row |
+| Double return or double renewal | The loan row is locked while it is returned or renewed; the second request sees the new state. A return also locks the member first, which is defensive |
+| A fine is paid once | The fine row is locked while it is paid; the second request gets `409 FINE_ALREADY_PAID` |
+| No deadlocks | Locks are always taken in the same order: member, copy, loan. Each wait is capped at 5 seconds and ends in `409 CONCURRENT_UPDATE` |
 | Renewal counter in range | `CHECK` constraint between 0 and 3 on `prestamo.renovaciones`. The bound is written into the schema; if `max-renovaciones` changes, a migration must change the constraint |
 
 ## 12. Time

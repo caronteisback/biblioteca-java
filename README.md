@@ -12,7 +12,8 @@ REST API for a library system (books, copies, members and loans), built with **J
 | B1 | Schema (`V1`), JPA entities and repositories, constraint and query tests | Done |
 | B2a | Business parameters, clock, error model (`{code, message}`), score, fine and alert calculation | Done |
 | B2b | Catalog and members: services and REST controllers | Done |
-| B2c | Loans, renewals, returns and fines, with concurrency tests | Planned |
+| B2c | Loans, renewals, returns and fines, with concurrency tests | Done |
+| C | OpenAPI documentation, final README review, release | Next |
 | C | OpenAPI documentation, integration tests for the loan flow, final README | Planned |
 
 ## Documentation
@@ -95,6 +96,16 @@ curl -X POST http://localhost:8080/api/v1/socios -H "Content-Type: application/j
 
 # list books whose title or author contains "faro", 5 per page
 curl "http://localhost:8080/api/v1/libros?q=faro&size=5"
+
+# lend copy 1 to member 1 (the due date is 14 days from today, set by the server)
+curl -X POST http://localhost:8080/api/v1/prestamos -H "Content-Type: application/json" -d '{"socioId":1,"ejemplarId":1}'
+
+# renew loan 1 (up to 3 times), then return it
+curl -X POST http://localhost:8080/api/v1/prestamos/1/renovacion
+curl -X POST http://localhost:8080/api/v1/prestamos/1/devolucion
+
+# the member now carries a score and alerts calculated from the history
+curl http://localhost:8080/api/v1/socios/1
 ```
 
 Every failure answers `{"code": "...", "message": "..."}` with the right status; see [API conventions](docs/api-conventions.md) and the error catalog in [business rules](docs/business-rules.md).
@@ -118,6 +129,9 @@ Tests start a throwaway Oracle XE 21c container with Testcontainers (Docker must
 - `LibroServiceTests`, `EjemplarServiceTests`, `SocioServiceTests`: the catalog and member rules against real Oracle, each error code checked.
 - `LibroControllerTests`, `EjemplarControllerTests`, `SocioControllerTests`: the HTTP contract (statuses, JSON, validation) with the service mocked.
 - `CatalogoApiTests`: the whole path, HTTP to Oracle, with the real error handler.
+- `PrestamoServiceTests`, `MultaServiceTests`: the loan rules at their exact boundaries (5th and 6th loan, score 50 and 49, due today and due yesterday), the order of the eight checks, renewals, fines.
+- `PrestamoControllerTests`, `MultaControllerTests`, `PrestamosApiTests`: the HTTP contract of loans and fines, and the whole life of a loan over HTTP.
+- `ConcurrenciaTests`: real threads against Oracle (no rollback): one copy and eight members, six loans for one member, double return, double renewal, double payment, retiring a copy while it is lent, and a lock held too long. Removing the row locks makes 6 of these 9 tests fail, so they do detect the races.
 
 ## Key decisions
 

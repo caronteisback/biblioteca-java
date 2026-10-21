@@ -11,15 +11,21 @@ Base path: `/api/v1`. Bodies are `application/json`. The API is open until the a
 | Books | `POST /libros`, `GET /libros`, `GET /libros/{id}`, `PUT /libros/{id}`, `DELETE /libros/{id}` |
 | Copies | `POST /libros/{libroId}/ejemplares`, `GET /libros/{libroId}/ejemplares`, `GET /ejemplares/{id}`, `POST /ejemplares/{id}/baja`, `POST /ejemplares/{id}/alta`, `DELETE /ejemplares/{id}` |
 | Members | `POST /socios`, `GET /socios`, `GET /socios/{id}`, `PUT /socios/{id}`, `POST /socios/{id}/desactivar`, `POST /socios/{id}/reactivar`, `DELETE /socios/{id}` |
+| Loans | `POST /prestamos` (body: `socioId`, `ejemplarId`), `GET /prestamos`, `GET /prestamos/{id}`, `POST /prestamos/{id}/renovacion`, `POST /prestamos/{id}/devolucion` |
+| Fines | `GET /multas`, `GET /multas/{id}`, `POST /multas/{id}/pago` |
 
-Loans (`/prestamos`) and fines (`/multas`) come next.
+A loan request carries only the member and the copy. Loan, due and return dates always come from the server clock; any date sent by the client is ignored.
+
+Optional filters: `GET /prestamos?socioId=&activo=` (`activo=true` lists loans not returned, `false` the returned ones) and `GET /multas?socioId=&estado=` (`PENDING` or `PAID`). A loan answer includes `diasRetraso`, `alertas` and, when it was returned late, its `multa`.
+
+When two requests collide on the same member, copy, loan or fine, the second one waits up to 5 seconds. If the lock is still not free it answers `409 CONCURRENT_UPDATE` and the client may retry.
 
 ## Status codes
 
 | Operation | Success |
 |-----------|---------|
 | Create | `201 Created` with a `Location` header and the created resource |
-| Read, update, action (`baja`, `alta`, `desactivar`, `reactivar`) | `200 OK` with the resource |
+| Read, update, action (`baja`, `alta`, `desactivar`, `reactivar`, `renovacion`, `devolucion`, `pago`) | `200 OK` with the resource |
 | Delete | `204 No Content`, no body |
 
 Failures use the [error model](business-rules.md#13-error-model): `{ "code": "...", "message": "..." }`.

@@ -36,8 +36,19 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p><b>Lock order: member, then copy, then loan.</b> Every operation that takes more than one lock
  * takes them in this order, so two requests can never wait for each other. Each wait is capped at
- * 5 seconds and ends in {@code CONCURRENT_UPDATE}. Creating a loan locks member and copy; returning
- * locks member and loan, because a return can create a fine that a loan being created must see.
+ * 5 seconds and ends in {@code CONCURRENT_UPDATE}.
+ *
+ * <ul>
+ * <li>Creating a loan locks the member (so the limit of active loans cannot be exceeded) and the copy
+ * (so two members cannot take it at once and a retired copy cannot be lent).
+ * <li>Renewing locks the loan. Returning locks the member and the loan.
+ * <li>Paying a fine locks the fine (see {@link MultaService}).
+ * </ul>
+ *
+ * <p>The member lock in a return is defensive. With the current order of the checks (overdue loan
+ * first, pending fine second) and Oracle's READ COMMITTED, a loan being created cannot slip past a
+ * fine that a return is creating, even without it: tests that removed the lock still passed. The lock
+ * keeps that rule from depending on the order of two checks.
  */
 @Service
 @RequiredArgsConstructor
