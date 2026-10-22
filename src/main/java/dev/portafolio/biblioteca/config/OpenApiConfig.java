@@ -52,7 +52,7 @@ import org.springframework.http.HttpMethod;
 public class OpenApiConfig {
 
 	/** Version of the contract (not of the artifact). Raise it when the API changes; see biblioteca-contrato. */
-	static final String API_VERSION = "0.3.0";
+	static final String API_VERSION = "0.4.0";
 
 	@Bean
 	OpenAPI bibliotecaOpenApi() {
@@ -83,7 +83,8 @@ public class OpenApiConfig {
 						new Tag().name("Copies").description("Physical copies of a book. Loans are made on copies."),
 						new Tag().name("Members").description("People who can borrow, with their score and alerts."),
 						new Tag().name("Loans").description("Lending, renewing and returning a copy."),
-						new Tag().name("Fines").description("Fines created by late returns.")));
+						new Tag().name("Fines").description("Fines created by late returns."),
+						new Tag().name("Dashboard").description("Totals and rankings for the home of the librarian.")));
 	}
 
 	@Bean

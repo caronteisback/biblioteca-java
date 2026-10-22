@@ -24,6 +24,7 @@ public record BibliotecaProperties(
 		@Valid @NotNull Prestamo prestamo,
 		@Valid @NotNull Multa multa,
 		@Valid @NotNull Score score,
+		@Valid @NotNull Panel panel,
 		@Valid @NotNull Cors cors) {
 
 	/**
@@ -46,6 +47,10 @@ public record BibliotecaProperties(
 			@Positive int maxActivos,
 			@Min(0) @Max(3) int maxRenovaciones,
 			@Min(0) int alertaDiasPrevios) {
+	}
+
+	/** @param diasPorVencer the dashboard counts as "due soon" the loans due within this many days, today included */
+	public record Panel(@Positive int diasPorVencer) {
 	}
 
 	/** @param porDia fine per day of delay, in soles */

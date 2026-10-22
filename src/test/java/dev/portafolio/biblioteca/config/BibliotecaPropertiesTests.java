@@ -22,6 +22,7 @@ class BibliotecaPropertiesTests {
 					"biblioteca.prestamo.max-activos=5",
 					"biblioteca.prestamo.max-renovaciones=3",
 					"biblioteca.prestamo.alerta-dias-previos=2",
+					"biblioteca.panel.dias-por-vencer=7",
 					"biblioteca.multa.por-dia=1.00",
 					"biblioteca.score.inicial=100",
 					"biblioteca.score.penalizacion-base=10",
@@ -40,6 +41,7 @@ class BibliotecaPropertiesTests {
 			assertThat(properties.prestamo().maxActivos()).isEqualTo(5);
 			assertThat(properties.prestamo().maxRenovaciones()).isEqualTo(3);
 			assertThat(properties.prestamo().alertaDiasPrevios()).isEqualTo(2);
+			assertThat(properties.panel().diasPorVencer()).isEqualTo(7);
 			assertThat(properties.multa().porDia()).isEqualByComparingTo(new BigDecimal("1.00"));
 			assertThat(properties.score().inicial()).isEqualTo(100);
 			assertThat(properties.score().penalizacionBase()).isEqualTo(10);
@@ -70,6 +72,12 @@ class BibliotecaPropertiesTests {
 	@Test
 	void theClockUsesTheConfiguredZone() {
 		runner.run(context -> assertThat(context.getBean(Clock.class).getZone()).isEqualTo(ZoneId.of("America/Lima")));
+	}
+
+	@Test
+	void aWindowOfZeroDaysForTheDashboardStopsTheStartup() {
+		runner.withPropertyValues("biblioteca.panel.dias-por-vencer=0")
+				.run(context -> assertThat(context).hasFailed());
 	}
 
 	@Test

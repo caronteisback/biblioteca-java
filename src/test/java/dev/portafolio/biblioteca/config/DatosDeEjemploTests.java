@@ -15,6 +15,7 @@ import dev.portafolio.biblioteca.service.LibroService;
 import dev.portafolio.biblioteca.service.UsuarioService;
 import dev.portafolio.biblioteca.repository.SocioRepository;
 import dev.portafolio.biblioteca.service.MultaService;
+import dev.portafolio.biblioteca.service.PanelService;
 import dev.portafolio.biblioteca.service.PrestamoService;
 import dev.portafolio.biblioteca.service.SocioService;
 import java.time.Duration;
@@ -37,6 +38,9 @@ class DatosDeEjemploTests extends BaseIntegracionTest {
 
 	@Autowired
 	private SocioService socioService;
+
+	@Autowired
+	private PanelService panel;
 
 	@Autowired
 	private PrestamoService prestamoService;
@@ -84,6 +88,45 @@ class DatosDeEjemploTests extends BaseIntegracionTest {
 
 		assertThat(datos.cargar()).isFalse();
 		assertThat(libros.count()).isEqualTo(20);
+	}
+
+	@Test
+	void theDemoGivesTheDashboardSomethingToShow() {
+		datos.cargar();
+
+		var resumen = panel.resumen();
+
+		assertThat(resumen.prestamos().activos()).isEqualTo(5);
+		assertThat(resumen.prestamos().vencidos()).as("Rosa's loan").isEqualTo(1);
+		assertThat(resumen.prestamos().porVencer()).as("Andrés's loan falls due in two days").isEqualTo(1);
+		assertThat(resumen.multas().pendientes()).isEqualTo(1);
+		assertThat(resumen.multas().montoPendiente()).isEqualByComparingTo("11.00");
+		assertThat(resumen.multas().sociosConMultaPendiente()).isEqualTo(1);
+		assertThat(resumen.sociosActivos()).isEqualTo(7);
+
+		assertThat(resumen.prestamosPorSemana()).hasSize(6);
+		assertThat(resumen.prestamosPorSemana().stream().filter(semana -> semana.prestamos() > 0)).as("weeks with loans").hasSizeGreaterThanOrEqualTo(5);
+
+		assertThat(resumen.masPrestados()).hasSize(5);
+		assertThat(resumen.masPrestados().get(0).titulo()).isEqualTo("El Faro Imaginado");
+		assertThat(resumen.masPrestados().get(0).prestamos()).isEqualTo(5);
+		assertThat(resumen.masPrestados().get(1).titulo()).isEqualTo("Cartografía de la Niebla");
+		assertThat(resumen.masPrestados().stream().map(libro -> libro.prestamos()).toList()).isSortedAccordingTo(java.util.Comparator.reverseOrder());
+
+		assertThat(resumen.requierenAtencion()).hasSize(2);
+		assertThat(resumen.requierenAtencion().get(0).nombreSocio()).isEqualTo("Rosa Valdivia");
+		assertThat(resumen.requierenAtencion().get(0).diasRetraso()).isEqualTo(4);
+		assertThat(resumen.requierenAtencion().get(1).nombreSocio()).isEqualTo("Andrés Paredes");
+		assertThat(resumen.requierenAtencion().get(1).alerta()).isEqualTo(AlertaCodigo.DUE_SOON);
+	}
+
+	@Test
+	void theHistoryIsReturnedOnTimeSoItDoesNotChangeAnyScoreOrFine() {
+		datos.cargar();
+
+		assertThat(multaService.listar(null, null, 0, 100).items()).hasSize(2);
+		assertThat(socioService.obtener(socios.findByEmailIgnoreCase("andres.paredes@example.org").orElseThrow().getId()).score()).isEqualTo(100);
+		assertThat(prestamoService.listar(null, false, 0, 100).items().size()).isGreaterThanOrEqualTo(19);
 	}
 
 	@Test

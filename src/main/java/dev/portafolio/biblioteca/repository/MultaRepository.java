@@ -24,6 +24,12 @@ public interface MultaRepository extends JpaRepository<Multa, Long>, JpaSpecific
 	/** True when any loan of the member has a fine in the given status. */
 	boolean existsByPrestamoSocioIdAndEstado(Long socioId, EstadoMulta estado);
 
+	/** Pending fines, their total and how many members owe them, in one query (the total is null when there are none). */
+	@Query("""
+			select new dev.portafolio.biblioteca.repository.ConteoDeMultas(count(m), sum(m.monto), count(distinct s.id))
+			from Multa m join m.prestamo p join p.socio s where m.estado = :estado""")
+	ConteoDeMultas contar(@Param("estado") EstadoMulta estado);
+
 	/** Locks the fine while it is paid, so it cannot be paid twice. */
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "5000"))

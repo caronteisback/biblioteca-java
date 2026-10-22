@@ -14,6 +14,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface SocioRepository extends JpaRepository<Socio, Long> {
 
+	/** Members that can borrow: the ones not deactivated. */
+	long countByActivoTrue();
+
 	Optional<Socio> findByEmailIgnoreCase(String email);
 
 	boolean existsByEmailIgnoreCase(String email);

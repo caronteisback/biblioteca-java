@@ -14,6 +14,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface EjemplarRepository extends JpaRepository<Ejemplar, Long> {
 
+	/** Copies that can be lent: the ones not retired. */
+	long countByActivoTrue();
+
 	Optional<Ejemplar> findByCodigo(String codigo);
 
 	boolean existsByCodigo(String codigo);

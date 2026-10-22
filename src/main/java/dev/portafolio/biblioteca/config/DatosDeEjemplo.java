@@ -145,6 +145,10 @@ public class DatosDeEjemplo {
 		long camila = socios.get(5).id();
 		long hugo = socios.get(7).id();
 
+		// The history of the last weeks, returned on time: it is what the dashboard counts per week and ranks by book.
+		// It goes first, before any member has an overdue loan or a fine that would stop a new loan.
+		historial(socios, copias);
+
 		// Andrés: one loan that falls due in two days and one that he renewed.
 		prestar(andres, copias.get(0).get(0), 12);
 		prestamoService.renovar(prestar(andres, copias.get(1).get(0), 3));
@@ -169,6 +173,35 @@ public class DatosDeEjemplo {
 
 		log.info("Demo data loaded: {} books, {} members.", LIBROS.length, socios.size());
 		return true;
+	}
+
+	/**
+	 * Loans of the last weeks that were returned on time: book, copy of the book, member, days ago it started and days it
+	 * lasted. The member is 0 Andrés, 1 Valeria, 2 Camila or 3 Lucía. The loans of a copy do not overlap one another or the
+	 * ones it has now. Together with the current loans they give a ranking with a clear first place and a few weeks of history.
+	 */
+	private static final int[][] HISTORIAL = {
+			{ 0, 0, 3, 40, 6 }, { 0, 0, 1, 33, 9 }, { 0, 0, 2, 22, 3 }, { 0, 0, 0, 18, 5 },
+			{ 1, 1, 0, 35, 8 }, { 1, 1, 1, 21, 6 }, { 1, 1, 3, 9, 4 },
+			{ 9, 0, 2, 30, 10 }, { 9, 0, 0, 16, 7 }, { 9, 0, 1, 6, 3 },
+			{ 4, 1, 0, 14, 5 }, { 4, 1, 2, 28, 6 },
+			{ 5, 1, 3, 24, 4 }, { 5, 1, 2, 11, 6 },
+			{ 6, 0, 1, 31, 7 },
+			{ 12, 0, 0, 38, 5 }, { 12, 0, 3, 7, 3 },
+			{ 15, 0, 1, 13, 6 },
+			{ 18, 0, 2, 4, 2 },
+	};
+
+	/**
+	 * Fills the history. A loan is made today through the service (so the rules apply) and then moved back in time and
+	 * marked as returned on a day of its own: returning it through the service would return it today, and late.
+	 */
+	private void historial(List<SocioResponse> socios, List<List<EjemplarResponse>> copias) {
+		long[] miembros = { socios.get(0).id(), socios.get(4).id(), socios.get(5).id(), socios.get(3).id() };
+		for (int[] fila : HISTORIAL) {
+			long id = prestar(miembros[fila[2]], copias.get(fila[0]).get(fila[1]), fila[3]);
+			jdbc.update("update prestamo set fecha_devolucion = fecha_prestamo + ? where id = ?", fila[4], id);
+		}
 	}
 
 	/** Lends a copy today and moves the loan back in time as if it had been made that many days ago. */

@@ -2,6 +2,18 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-10-22
+
+Adds one operation (contract biblioteca-contrato v0.4.0); a client written for 0.4.x keeps working.
+
+### Added
+
+- **`GET /api/v1/panel`** (librarians only): the figures for the home of the librarian, as of today and calculated now. Active, overdue and soon-to-be-due loans (the window, 7 days, is `biblioteca.panel.dias-por-vencer`), the copies that can be lent and the members that can borrow, pending fines with their total and how many members owe them, loans started in each of the last 6 weeks (a week starts on Monday), the 5 most borrowed books of the last 90 days and the 5 loans that need attention most (overdue first, the most late first, then the ones due soon).
+- It costs a handful of aggregate queries, counted by the database: loans, fines and the ranking are never loaded to be counted. A test proves the number of statements does not grow with the number of loans, fines or books.
+- **Demo data with a history:** 19 loans returned on time over the last six weeks, spread over several books, so the dashboard has bars and a ranking when the demo starts. They are returned on time, so no score or fine changes.
+- `Dashboard` tag in the OpenAPI description; the new operation is closed to members without anyone listing it (anything not named under `/api` is for librarians).
+- 14 tests (417 in total).
+
 ## [0.4.0] - 2026-10-22
 
 Adds fields to answers (contract biblioteca-contrato v0.3.0); a client written for 0.3.x keeps working.

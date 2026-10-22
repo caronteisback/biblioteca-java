@@ -171,6 +171,21 @@ class ContratoTests extends BaseApiSegura {
 	}
 
 	@Test
+	void theDashboardFollowsTheContract() throws Exception {
+		Socio socio = socio();
+		prestamos.saveAndFlush(prestamo(ejemplar(), socio, HOY.minusDays(19), 14));
+		prestamos.saveAndFlush(prestamo(ejemplar(), socio, HOY, 14));
+		var devuelto = prestamo(ejemplar(), socio, HOY.minusDays(9), 14);
+		devuelto.devolver(HOY.minusDays(5));
+		prestamos.saveAndFlush(devuelto);
+
+		llamar(HttpMethod.GET, "/api/v1/panel", null, 200);
+
+		tokenActual = token(cuentaDe(socio));
+		llamarRefusado(HttpMethod.GET, "/api/v1/panel", "/api/v1/panel", null, 403);
+	}
+
+	@Test
 	void everyKindOfBadRequestUsesTheDocumentedErrorShape() throws Exception {
 		llamarInvalido(HttpMethod.POST, "/api/v1/prestamos", "{}", 400);
 		llamarInvalido(HttpMethod.POST, "/api/v1/libros", "{\"isbn\":\"\",\"titulo\":\"\",\"autor\":\"\"}", 400);
@@ -268,7 +283,7 @@ class ContratoTests extends BaseApiSegura {
 		}));
 
 		assertThat(problemas).isEmpty();
-		assertThat(comprobadas[0]).as("30 operations, three actors each").isEqualTo(90);
+		assertThat(comprobadas[0]).as("31 operations, three actors each").isEqualTo(93);
 	}
 
 	@AfterAll

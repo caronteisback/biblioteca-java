@@ -59,9 +59,10 @@ class OpenApiDocumentTests extends BaseIntegracionTest {
 			"GET /api/v1/prestamos", "POST /api/v1/prestamos", "GET /api/v1/prestamos/{id}",
 			"POST /api/v1/prestamos/{id}/renovacion", "POST /api/v1/prestamos/{id}/devolucion",
 			"GET /api/v1/multas", "GET /api/v1/multas/{id}", "POST /api/v1/multas/{id}/pago",
-			"POST /api/v1/auth/login", "GET /api/v1/me", "GET /api/v1/me/prestamos", "GET /api/v1/me/multas"));
+			"POST /api/v1/auth/login", "GET /api/v1/me", "GET /api/v1/me/prestamos", "GET /api/v1/me/multas",
+			"GET /api/v1/panel"));
 
-	private static final Set<String> ETIQUETAS = Set.of("Authentication", "Account", "Books", "Copies", "Members", "Loans", "Fines");
+	private static final Set<String> ETIQUETAS = Set.of("Authentication", "Account", "Books", "Copies", "Members", "Loans", "Fines", "Dashboard");
 
 	@Autowired
 	private MockMvc mvc;

@@ -30,6 +30,9 @@ biblioteca:
     alerta-dias-previos: 2
   multa:
     por-dia: 1.00
+  panel:
+    # The dashboard counts as "due soon" the loans due within this many days (the alert of a loan uses alerta-dias-previos).
+    dias-por-vencer: 7
   score:
     inicial: 100
     penalizacion-base: 10

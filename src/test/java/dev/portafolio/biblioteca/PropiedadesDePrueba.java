@@ -17,6 +17,7 @@ public final class PropiedadesDePrueba {
 				new BibliotecaProperties.Prestamo(14, 5, 3, 2),
 				new BibliotecaProperties.Multa(new BigDecimal("1.00")),
 				new BibliotecaProperties.Score(100, 10, 1, 50),
+				new BibliotecaProperties.Panel(7),
 				new BibliotecaProperties.Cors(List.of("http://localhost:5500")));
 	}
 

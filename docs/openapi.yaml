@@ -18,7 +18,7 @@ info:
     name: MIT
     url: https://opensource.org/license/mit
   title: Biblioteca API
-  version: 0.3.0
+  version: 0.4.0
 servers:
 - description: Local development
   url: http://localhost:8080
@@ -39,6 +39,8 @@ tags:
   name: Loans
 - description: Fines created by late returns.
   name: Fines
+- description: Totals and rankings for the home of the librarian.
+  name: Dashboard
 paths:
   /api/v1/auth/login:
     post:
@@ -1410,6 +1412,57 @@ paths:
       summary: Pay a fine
       tags:
       - Fines
+  /api/v1/panel:
+    get:
+      description: |-
+        The figures for the home of the librarian, all as of today (in the library's time zone) and calculated now from the loans, fines and members: nothing is stored.
+
+        - `prestamos`: active loans, how many are overdue and how many are due within `diasPorVencer` days (today included).
+        - `multas`: the pending fines, their total and how many members have one.
+        - `prestamosPorSemana`: loans started in each of the last 6 weeks, the current one included, oldest first. A week starts on Monday; a week without loans counts 0.
+        - `masPrestados`: up to 5 books with the most loans started in the last 90 days.
+        - `requierenAtencion`: up to 5 active loans that are overdue (the most late first) or due within `diasPorVencer` days (the soonest first).
+      operationId: getDashboard
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PanelResponse"
+          description: OK
+        "401":
+          content:
+            application/json:
+              examples:
+                UNAUTHENTICATED:
+                  $ref: "#/components/examples/UNAUTHENTICATED"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `UNAUTHENTICATED`."
+        "403":
+          content:
+            application/json:
+              examples:
+                FORBIDDEN:
+                  $ref: "#/components/examples/FORBIDDEN"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `FORBIDDEN`."
+        "500":
+          content:
+            application/json:
+              examples:
+                INTERNAL_ERROR:
+                  $ref: "#/components/examples/INTERNAL_ERROR"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: "Error. Possible codes: `INTERNAL_ERROR`."
+      security:
+      - bearerAuth:
+        - LIBRARIAN
+      summary: Get the dashboard of the library
+      tags:
+      - Dashboard
   /api/v1/prestamos:
     get:
       description: Paginated and always ordered by id.
@@ -2599,6 +2652,46 @@ components:
       required:
       - code
       - message
+    CasoDeAtencion:
+      type: object
+      description: An active loan that needs the librarian's attention.
+      properties:
+        alerta:
+          type: string
+          description: "OVERDUE when the due date has passed, DUE_SOON when it is\
+            \ within the days that the dashboard counts as soon."
+          enum:
+          - DUE_SOON
+          - OVERDUE
+        codigoEjemplar:
+          type: string
+        diasRetraso:
+          type: integer
+          format: int32
+          description: Days late as of today; zero when the loan is only due soon.
+          minimum: 0
+        fechaVencimiento:
+          type: string
+          format: date
+        nombreSocio:
+          type: string
+        prestamoId:
+          type: integer
+          format: int64
+        socioId:
+          type: integer
+          format: int64
+        tituloLibro:
+          type: string
+      required:
+      - alerta
+      - codigoEjemplar
+      - diasRetraso
+      - fechaVencimiento
+      - nombreSocio
+      - prestamoId
+      - socioId
+      - tituloLibro
     EjemplarRequest:
       type: object
       properties:
@@ -2679,6 +2772,23 @@ components:
       required:
       - code
       - message
+    LibroMasPrestado:
+      type: object
+      properties:
+        libroId:
+          type: integer
+          format: int64
+        prestamos:
+          type: integer
+          format: int64
+          description: Loans of any copy of the book started in the last 90 days.
+          minimum: 1
+        titulo:
+          type: string
+      required:
+      - libroId
+      - prestamos
+      - titulo
     LibroRequest:
       type: object
       properties:
@@ -2930,6 +3040,55 @@ components:
       - size
       - totalElements
       - totalPages
+    PanelResponse:
+      type: object
+      description: "The figures of the dashboard of the librarian, as of today."
+      properties:
+        ejemplaresActivos:
+          type: integer
+          format: int64
+          description: Copies that can be lent (not retired).
+          minimum: 0
+        fecha:
+          type: string
+          format: date
+          description: "Today in the library's time zone, set by the server. Every\
+            \ figure is as of this day."
+        masPrestados:
+          type: array
+          description: "Up to 5 books with the most loans started in the last 90 days,\
+            \ the most borrowed first."
+          items:
+            $ref: "#/components/schemas/LibroMasPrestado"
+        multas:
+          $ref: "#/components/schemas/ResumenDeMultas"
+        prestamos:
+          $ref: "#/components/schemas/ResumenDePrestamos"
+        prestamosPorSemana:
+          type: array
+          description: "Loans started in each of the last 6 weeks, the current one\
+            \ included, oldest first. Always 6 entries."
+          items:
+            $ref: "#/components/schemas/SemanaDePrestamos"
+        requierenAtencion:
+          type: array
+          description: Up to 5 active loans that are overdue (the most late first)
+            or due soon (the soonest first).
+          items:
+            $ref: "#/components/schemas/CasoDeAtencion"
+        sociosActivos:
+          type: integer
+          format: int64
+          minimum: 0
+      required:
+      - ejemplaresActivos
+      - fecha
+      - masPrestados
+      - multas
+      - prestamos
+      - prestamosPorSemana
+      - requierenAtencion
+      - sociosActivos
     PrestamoRequest:
       type: object
       properties:
@@ -3049,6 +3208,70 @@ components:
       - maxPrestamosActivos
       - maxRenovaciones
       - puntajeMinimo
+    ResumenDeMultas:
+      type: object
+      properties:
+        montoPendiente:
+          type: number
+          description: "Total of the pending fines, in soles."
+          example: 19.0
+        pendientes:
+          type: integer
+          format: int64
+          minimum: 0
+        sociosConMultaPendiente:
+          type: integer
+          format: int64
+          description: Members with at least one pending fine; they cannot start new
+            loans until they pay.
+          minimum: 0
+      required:
+      - montoPendiente
+      - pendientes
+      - sociosConMultaPendiente
+    ResumenDePrestamos:
+      type: object
+      properties:
+        activos:
+          type: integer
+          format: int64
+          description: Loans whose copy has not been returned.
+          minimum: 0
+        diasPorVencer:
+          type: integer
+          format: int32
+          description: "The window, in days, that `porVencer` counts (today included)."
+          minimum: 1
+        porVencer:
+          type: integer
+          format: int64
+          description: "Active loans, not yet overdue, due within `diasPorVencer`\
+            \ days."
+          minimum: 0
+        vencidos:
+          type: integer
+          format: int64
+          description: Active loans whose due date has passed.
+          minimum: 0
+      required:
+      - activos
+      - diasPorVencer
+      - porVencer
+      - vencidos
+    SemanaDePrestamos:
+      type: object
+      properties:
+        prestamos:
+          type: integer
+          format: int64
+          minimum: 0
+        semana:
+          type: string
+          format: date
+          description: The Monday that starts the week.
+      required:
+      - prestamos
+      - semana
     SocioRequest:
       type: object
       properties:
