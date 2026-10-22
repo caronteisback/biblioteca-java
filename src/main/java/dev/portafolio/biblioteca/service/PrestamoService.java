@@ -116,6 +116,10 @@ public class PrestamoService {
 	@Transactional(readOnly = true)
 	public PaginaDto<PrestamoResponse> listar(Long socioId, Boolean activo, int page, int size) {
 		Specification<Prestamo> filtro = (root, query, builder) -> {
+			if (query != null && query.getResultType() != Long.class) {
+				// The page names each loan by its book and copy: one query instead of two more per row. The count query must not fetch.
+				root.fetch("ejemplar").fetch("libro");
+			}
 			List<Predicate> condiciones = new ArrayList<>();
 			if (socioId != null) {
 				condiciones.add(builder.equal(root.get("socio").get("id"), socioId));

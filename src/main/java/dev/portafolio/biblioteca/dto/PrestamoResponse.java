@@ -12,6 +12,8 @@ import java.util.List;
 public record PrestamoResponse(
 		Long id,
 		Long ejemplarId,
+		@Schema(description = "Code of the borrowed copy, so a screen can name it without a second call.") String codigoEjemplar,
+		@Schema(description = "Title of the book the borrowed copy belongs to, so a screen can name the loan without a second call.") String tituloLibro,
 		Long socioId,
 		@Schema(description = "Day the loan started, set by the server.") LocalDate fechaPrestamo,
 		@Schema(description = "Last day to return without a fine. Each renewal moves it forward.") LocalDate fechaVencimiento,
@@ -26,6 +28,8 @@ public record PrestamoResponse(
 		return new PrestamoResponse(
 				prestamo.getId(),
 				prestamo.getEjemplar().getId(),
+				prestamo.getEjemplar().getCodigo(),
+				prestamo.getEjemplar().getLibro().getTitulo(),
 				prestamo.getSocio().getId(),
 				prestamo.getFechaPrestamo(),
 				prestamo.getFechaVencimiento(),

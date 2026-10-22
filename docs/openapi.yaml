@@ -18,7 +18,7 @@ info:
     name: MIT
     url: https://opensource.org/license/mit
   title: Biblioteca API
-  version: 0.2.1
+  version: 0.3.0
 servers:
 - description: Local development
   url: http://localhost:8080
@@ -2955,6 +2955,10 @@ components:
           description: DUE_SOON or OVERDUE for an active loan; empty once returned.
           items:
             $ref: "#/components/schemas/Alerta"
+        codigoEjemplar:
+          type: string
+          description: "Code of the borrowed copy, so a screen can name it without\
+            \ a second call."
         diasRetraso:
           type: integer
           format: int32
@@ -2996,9 +3000,14 @@ components:
         socioId:
           type: integer
           format: int64
+        tituloLibro:
+          type: string
+          description: "Title of the book the borrowed copy belongs to, so a screen\
+            \ can name the loan without a second call."
       required:
       - activo
       - alertas
+      - codigoEjemplar
       - diasRetraso
       - ejemplarId
       - fechaPrestamo
@@ -3006,6 +3015,40 @@ components:
       - id
       - renovaciones
       - socioId
+      - tituloLibro
+    ReglasDePrestamo:
+      type: object
+      description: "The lending rules the API applies, so a screen can show a member\
+        \ how close they are to a limit without copying the numbers."
+      properties:
+        diasPlazo:
+          type: integer
+          format: int32
+          description: Days granted by a loan and by each renewal.
+          minimum: 1
+        maxPrestamosActivos:
+          type: integer
+          format: int32
+          description: "Active loans a member may have at once; with that many, a\
+            \ new loan is refused with LOAN_LIMIT_REACHED."
+          minimum: 1
+        maxRenovaciones:
+          type: integer
+          format: int32
+          description: Renewals allowed per loan.
+          maximum: 3
+          minimum: 0
+        puntajeMinimo:
+          type: integer
+          format: int32
+          description: A member whose score is below this cannot start new loans (MEMBER_BLOCKED_BY_SCORE).
+          maximum: 100
+          minimum: 0
+      required:
+      - diasPlazo
+      - maxPrestamosActivos
+      - maxRenovaciones
+      - puntajeMinimo
     SocioRequest:
       type: object
       properties:
@@ -3086,6 +3129,8 @@ components:
         id:
           type: integer
           format: int64
+        reglas:
+          $ref: "#/components/schemas/ReglasDePrestamo"
         rol:
           type: string
           enum:
@@ -3100,6 +3145,7 @@ components:
       required:
       - email
       - id
+      - reglas
       - rol
   securitySchemes:
     bearerAuth:

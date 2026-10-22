@@ -15,6 +15,7 @@ import com.jayway.jsonpath.JsonPath;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import dev.portafolio.biblioteca.BaseApiSegura;
+import dev.portafolio.biblioteca.config.BibliotecaProperties;
 import dev.portafolio.biblioteca.entity.Ejemplar;
 import dev.portafolio.biblioteca.entity.Socio;
 import dev.portafolio.biblioteca.entity.Usuario;
@@ -45,6 +46,9 @@ class SeguridadApiTests extends BaseApiSegura {
 
 	@Autowired
 	private Clock clock;
+
+	@Autowired
+	private BibliotecaProperties propiedades;
 
 	@PersistenceContext
 	private EntityManager em;
@@ -78,6 +82,30 @@ class SeguridadApiTests extends BaseApiSegura {
 				.andExpect(jsonPath("$.usuario.rol").value("MEMBER"))
 				.andExpect(jsonPath("$.usuario.socio.score").value(100))
 				.andExpect(jsonPath("$.usuario.socio.alertas").isEmpty());
+	}
+
+	@Test
+	void theLendingRulesComeWithTheAccountOfAMemberAndOfALibrarian() throws Exception {
+		for (Usuario cuenta : List.of(cuentaDe(socio()), bibliotecario())) {
+			mvc.perform(get("/api/v1/me").header("Authorization", bearer(token(cuenta))))
+					.andExpect(status().isOk())
+					.andExpect(jsonPath("$.reglas.maxPrestamosActivos").value(5))
+					.andExpect(jsonPath("$.reglas.puntajeMinimo").value(50))
+					.andExpect(jsonPath("$.reglas.maxRenovaciones").value(3))
+					.andExpect(jsonPath("$.reglas.diasPlazo").value(14));
+		}
+	}
+
+	@Test
+	void theLendingRulesAreTheOnesTheLoanServiceApplies() throws Exception {
+		BibliotecaProperties configuradas = propiedades;
+
+		String cuerpo = mvc.perform(get("/api/v1/me").header("Authorization", bearer(token(bibliotecario())))).andReturn().getResponse().getContentAsString();
+
+		assertThat(JsonPath.<Integer>read(cuerpo, "$.reglas.maxPrestamosActivos")).isEqualTo(configuradas.prestamo().maxActivos());
+		assertThat(JsonPath.<Integer>read(cuerpo, "$.reglas.puntajeMinimo")).isEqualTo(configuradas.score().umbralBloqueo());
+		assertThat(JsonPath.<Integer>read(cuerpo, "$.reglas.maxRenovaciones")).isEqualTo(configuradas.prestamo().maxRenovaciones());
+		assertThat(JsonPath.<Integer>read(cuerpo, "$.reglas.diasPlazo")).isEqualTo(configuradas.prestamo().diasPlazo());
 	}
 
 	@Test
@@ -304,7 +332,8 @@ class SeguridadApiTests extends BaseApiSegura {
 		mvc.perform(get("/api/v1/me").header("Authorization", bearer(token)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.rol").value("LIBRARIAN"))
-				.andExpect(jsonPath("$.socio").doesNotExist());
+				.andExpect(jsonPath("$.socio").doesNotExist())
+				.andExpect(jsonPath("$.reglas.maxPrestamosActivos").value(5));
 		mvc.perform(get("/api/v1/me/prestamos").header("Authorization", bearer(token))).andExpect(status().isForbidden());
 		mvc.perform(get("/api/v1/me/multas").header("Authorization", bearer(token))).andExpect(status().isForbidden());
 	}
@@ -325,6 +354,8 @@ class SeguridadApiTests extends BaseApiSegura {
 				.andReturn().getResponse().getContentAsString();
 		assertThat(JsonPath.<List<Integer>>read(cuerpo, "$.items[*].socioId")).containsExactly(ana.getId().intValue());
 		assertThat(JsonPath.<List<Integer>>read(cuerpo, "$.items[*].id")).containsExactly(prestamoDeAna.getId().intValue());
+		assertThat(JsonPath.<List<String>>read(cuerpo, "$.items[*].tituloLibro")).containsExactly(deAna.getLibro().getTitulo());
+		assertThat(JsonPath.<List<String>>read(cuerpo, "$.items[*].codigoEjemplar")).containsExactly(deAna.getCodigo());
 
 		// The member is never read from the request: asking for another one changes nothing.
 		String conOtroSocio = mvc.perform(get("/api/v1/me/prestamos").param("socioId", String.valueOf(berta.getId())).header("Authorization", bearer(tokenDeAna)))

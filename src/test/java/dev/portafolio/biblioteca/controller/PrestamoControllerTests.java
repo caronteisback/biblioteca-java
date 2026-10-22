@@ -49,7 +49,7 @@ class PrestamoControllerTests {
 	private PrestamoService servicio;
 
 	private PrestamoResponse vigente() {
-		return new PrestamoResponse(9L, 5L, 3L, HOY, HOY.plusDays(14), null, 0, true, 0, List.of(), null);
+		return new PrestamoResponse(9L, 5L, "EJ-5", "El Faro Imaginado", 3L, HOY, HOY.plusDays(14), null, 0, true, 0, List.of(), null);
 	}
 
 	@Test
@@ -121,7 +121,7 @@ class PrestamoControllerTests {
 
 	@Test
 	void readsALoanWithItsAlerts() throws Exception {
-		when(servicio.obtener(9L)).thenReturn(new PrestamoResponse(9L, 5L, 3L, HOY.minusDays(17), HOY.minusDays(3), null, 0, true, 3,
+		when(servicio.obtener(9L)).thenReturn(new PrestamoResponse(9L, 5L, "EJ-5", "El Faro Imaginado", 3L, HOY.minusDays(17), HOY.minusDays(3), null, 0, true, 3,
 				List.of(new Alerta(AlertaCodigo.OVERDUE, "Overdue by 3 day(s). Fine so far: S/ 3.00.")), null));
 
 		mvc.perform(get("/api/v1/prestamos/9"))
@@ -175,7 +175,7 @@ class PrestamoControllerTests {
 
 	@Test
 	void renewsALoan() throws Exception {
-		when(servicio.renovar(9L)).thenReturn(new PrestamoResponse(9L, 5L, 3L, HOY, HOY.plusDays(28), null, 1, true, 0, List.of(), null));
+		when(servicio.renovar(9L)).thenReturn(new PrestamoResponse(9L, 5L, "EJ-5", "El Faro Imaginado", 3L, HOY, HOY.plusDays(28), null, 1, true, 0, List.of(), null));
 
 		mvc.perform(post("/api/v1/prestamos/9/renovacion"))
 				.andExpect(status().isOk())
@@ -197,7 +197,7 @@ class PrestamoControllerTests {
 	@Test
 	void returnsALoanAndShowsTheFineWhenThereWasADelay() throws Exception {
 		MultaResponse multa = new MultaResponse(4L, 9L, 5, new BigDecimal("5.00"), EstadoMulta.PENDING, HOY, null);
-		when(servicio.devolver(9L)).thenReturn(new PrestamoResponse(9L, 5L, 3L, HOY.minusDays(19), HOY.minusDays(5), HOY, 0, false, 5, List.of(), multa));
+		when(servicio.devolver(9L)).thenReturn(new PrestamoResponse(9L, 5L, "EJ-5", "El Faro Imaginado", 3L, HOY.minusDays(19), HOY.minusDays(5), HOY, 0, false, 5, List.of(), multa));
 
 		mvc.perform(post("/api/v1/prestamos/9/devolucion"))
 				.andExpect(status().isOk())

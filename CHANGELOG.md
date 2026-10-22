@@ -2,6 +2,16 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-10-22
+
+Adds fields to answers (contract biblioteca-contrato v0.3.0); a client written for 0.3.x keeps working.
+
+### Added
+
+- **`reglas` in `GET /api/v1/me`**, for a member and for a librarian: the maximum of active loans, the minimum score to borrow, the renewals per loan and the days of a term, read from the same configuration the loan rules use. A screen can show how close a member is to a limit without copying the numbers. A test checks the numbers against the configuration.
+- **`tituloLibro` and `codigoEjemplar` in every loan**, so a loan can be named without a second call. The list of loans fetches the copy and the book in the same query; a test proves the number of queries does not grow with the number of loans (it fails if the fetch is removed).
+- 4 tests (403 in total).
+
 ## [0.3.1] - 2026-10-21
 
 ### Fixed

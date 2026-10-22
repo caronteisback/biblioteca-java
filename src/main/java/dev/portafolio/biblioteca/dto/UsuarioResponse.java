@@ -9,10 +9,11 @@ public record UsuarioResponse(
 		Long id,
 		String email,
 		Rol rol,
-		@Schema(nullable = true, description = "The member data, with score and alerts, when the role is MEMBER; null for a librarian.") SocioResponse socio) {
+		@Schema(nullable = true, description = "The member data, with score and alerts, when the role is MEMBER; null for a librarian.") SocioResponse socio,
+		ReglasDePrestamo reglas) {
 
-	public static UsuarioResponse de(Usuario usuario, SocioResponse socio) {
-		return new UsuarioResponse(usuario.getId(), usuario.getEmail(), usuario.getRol(), socio);
+	public static UsuarioResponse de(Usuario usuario, SocioResponse socio, ReglasDePrestamo reglas) {
+		return new UsuarioResponse(usuario.getId(), usuario.getEmail(), usuario.getRol(), socio, reglas);
 	}
 
 }

@@ -52,7 +52,7 @@ import org.springframework.http.HttpMethod;
 public class OpenApiConfig {
 
 	/** Version of the contract (not of the artifact). Raise it when the API changes; see biblioteca-contrato. */
-	static final String API_VERSION = "0.2.1";
+	static final String API_VERSION = "0.3.0";
 
 	@Bean
 	OpenAPI bibliotecaOpenApi() {

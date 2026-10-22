@@ -1,15 +1,23 @@
 package dev.portafolio.biblioteca.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jayway.jsonpath.JsonPath;
 import dev.portafolio.biblioteca.BaseIntegracionTest;
 import dev.portafolio.biblioteca.entity.Ejemplar;
 import dev.portafolio.biblioteca.entity.Prestamo;
 import dev.portafolio.biblioteca.entity.Socio;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.PersistenceContext;
+import java.util.List;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -27,6 +35,12 @@ class PrestamosApiTests extends BaseIntegracionTest {
 
 	@Autowired
 	private MockMvc mvc;
+
+	@Autowired
+	private EntityManagerFactory fabrica;
+
+	@PersistenceContext
+	private EntityManager em;
 
 	private String idDe(String json) {
 		return json.replaceAll("^\\{\"id\":(\\d+).*$", "$1");
@@ -67,6 +81,58 @@ class PrestamosApiTests extends BaseIntegracionTest {
 		mvc.perform(post("/api/v1/prestamos/" + id + "/devolucion"))
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.code").value("LOAN_ALREADY_RETURNED"));
+	}
+
+	@Test
+	void everyLoanNamesItsBookAndItsCopy() throws Exception {
+		Socio socio = socio();
+		Ejemplar ejemplar = ejemplar();
+
+		String creado = prestar(socio, ejemplar);
+		String id = idDe(creado);
+		assertThat(JsonPath.<String>read(creado, "$.tituloLibro")).isEqualTo(ejemplar.getLibro().getTitulo());
+		assertThat(JsonPath.<String>read(creado, "$.codigoEjemplar")).isEqualTo(ejemplar.getCodigo());
+
+		mvc.perform(get("/api/v1/prestamos/" + id))
+				.andExpect(jsonPath("$.tituloLibro").value(ejemplar.getLibro().getTitulo()))
+				.andExpect(jsonPath("$.codigoEjemplar").value(ejemplar.getCodigo()));
+		mvc.perform(get("/api/v1/prestamos").param("socioId", String.valueOf(socio.getId())))
+				.andExpect(jsonPath("$.items[0].tituloLibro").value(ejemplar.getLibro().getTitulo()))
+				.andExpect(jsonPath("$.items[0].codigoEjemplar").value(ejemplar.getCodigo()));
+		mvc.perform(post("/api/v1/prestamos/" + id + "/renovacion"))
+				.andExpect(jsonPath("$.tituloLibro").value(ejemplar.getLibro().getTitulo()));
+		mvc.perform(post("/api/v1/prestamos/" + id + "/devolucion"))
+				.andExpect(jsonPath("$.tituloLibro").value(ejemplar.getLibro().getTitulo()))
+				.andExpect(jsonPath("$.codigoEjemplar").value(ejemplar.getCodigo()));
+	}
+
+	@Test
+	void listingLoansCostsTheSameNumberOfQueriesWhateverTheNumberOfLoans() throws Exception {
+		Statistics estadisticas = fabrica.unwrap(SessionFactory.class).getStatistics();
+		estadisticas.setStatisticsEnabled(true);
+		Socio conUno = socio();
+		Socio conCuatro = socio();
+		prestamos.saveAndFlush(prestamo(ejemplar(), conUno, HOY, 14));
+		for (int i = 0; i < 4; i++) {
+			prestamos.saveAndFlush(prestamo(ejemplar(), conCuatro, HOY, 14));
+		}
+
+		long conUnPrestamo = consultasAlListar(estadisticas, conUno);
+		long conCuatroPrestamos = consultasAlListar(estadisticas, conCuatro);
+
+		assertThat(conCuatroPrestamos).as("queries to list 4 loans vs 1 loan").isEqualTo(conUnPrestamo);
+	}
+
+	private long consultasAlListar(Statistics estadisticas, Socio socio) throws Exception {
+		// The test runs inside one transaction: without this the loans, copies and books are still in memory and no query is needed.
+		em.flush();
+		em.clear();
+		estadisticas.clear();
+		String cuerpo = mvc.perform(get("/api/v1/prestamos").param("socioId", String.valueOf(socio.getId())))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		assertThat(JsonPath.<List<String>>read(cuerpo, "$.items[*].tituloLibro")).isNotEmpty().doesNotContainNull();
+		return estadisticas.getPrepareStatementCount();
 	}
 
 	@Test

@@ -1,8 +1,10 @@
 package dev.portafolio.biblioteca.service;
 
+import dev.portafolio.biblioteca.config.BibliotecaProperties;
 import dev.portafolio.biblioteca.dto.MultaResponse;
 import dev.portafolio.biblioteca.dto.PaginaDto;
 import dev.portafolio.biblioteca.dto.PrestamoResponse;
+import dev.portafolio.biblioteca.dto.ReglasDePrestamo;
 import dev.portafolio.biblioteca.dto.SocioResponse;
 import dev.portafolio.biblioteca.dto.UsuarioResponse;
 import dev.portafolio.biblioteca.entity.EstadoMulta;
@@ -26,6 +28,7 @@ public class CuentaService {
 	private final SocioService socioService;
 	private final PrestamoService prestamoService;
 	private final MultaService multaService;
+	private final BibliotecaProperties propiedades;
 
 	/** The account, as it is now. An account that no longer exists or is switched off is treated as signed out. */
 	@Transactional(readOnly = true)
@@ -46,10 +49,10 @@ public class CuentaService {
 		return multaService.listar(exigirSocio(socioId), estado, page, size);
 	}
 
-	/** The response for an account: for a member it carries the member data, with score and alerts. */
+	/** The response for an account: the lending rules and, for a member, the member data with score and alerts. */
 	UsuarioResponse respuesta(Usuario usuario) {
 		SocioResponse socio = usuario.getSocio() == null ? null : socioService.obtener(usuario.getSocio().getId());
-		return UsuarioResponse.de(usuario, socio);
+		return UsuarioResponse.de(usuario, socio, ReglasDePrestamo.de(propiedades));
 	}
 
 	private static Long exigirSocio(Long socioId) {
